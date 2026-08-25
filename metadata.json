@@ -1,0 +1,8 @@
+{
+  "name": "Deniz Seyir & Gelgit Navigasyonu",
+  "description": "GPS konumu, canlı rüzgar, dalga yüksekliği, basınç, bağıl nem, yağış, rüzgar hamlesi, yere göre sürat ve gelgit güvenli geçiş hesaplayıcı",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
