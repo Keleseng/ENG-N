@@ -36,8 +36,16 @@ fun CalculationHistoryView(
   onNavigateToTide: () -> Unit = {},
   modifier: Modifier = Modifier
 ) {
+  val isDarkMode = uiState.isDarkMode
   var selectedSubTab by remember { mutableStateOf(0) } // 0: Demirleme, 1: Gelgit
   var showClearConfirmDialog by remember { mutableStateOf(false) }
+
+  val cardBg = getMarineCardBg(isDarkMode)
+  val cardBorder = getMarineCardBorder(isDarkMode)
+  val subtleBg = getMarineSubtleBg(isDarkMode)
+  val subtleBorder = getMarineSubtleBorder(isDarkMode)
+  val textPrimary = getMarineTextPrimary(isDarkMode)
+  val textMuted = getMarineTextMuted(isDarkMode)
 
   Column(
     modifier = modifier
@@ -50,9 +58,9 @@ fun CalculationHistoryView(
     // ══════════════════════════════════════════════════════════════
     Surface(
       shape = RoundedCornerShape(14.dp),
-      color = CardWhite,
+      color = cardBg,
       shadowElevation = 2.dp,
-      border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
+      border = androidx.compose.foundation.BorderStroke(1.dp, cardBorder)
     ) {
       Row(
         modifier = Modifier
@@ -68,13 +76,13 @@ fun CalculationHistoryView(
           Box(
             modifier = Modifier
               .size(38.dp)
-              .background(PrimaryBlueLight, CircleShape),
+              .background(if (isDarkMode) PrimaryBlueLight else Color(0xFFDBEAFE), CircleShape),
             contentAlignment = Alignment.Center
           ) {
             Icon(
               imageVector = Icons.Default.History,
               contentDescription = null,
-              tint = MarineCyan,
+              tint = if (isDarkMode) MarineCyan else PrimaryBlueDark,
               modifier = Modifier.size(22.dp)
             )
           }
@@ -82,12 +90,12 @@ fun CalculationHistoryView(
             Text(
               text = "Hesaplama Geçmişi (Room DB)",
               style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black, fontSize = 15.sp),
-              color = TextPrimary
+              color = textPrimary
             )
             Text(
               text = "Kayıtlı Demirleme ve Gelgit Verileri",
               style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-              color = TextMuted
+              color = textMuted
             )
           }
         }
@@ -114,7 +122,7 @@ fun CalculationHistoryView(
       uiState.saveSuccessMessage?.let { msg ->
         Surface(
           shape = RoundedCornerShape(10.dp),
-          color = SeaGreenDark,
+          color = if (isDarkMode) SeaGreenDark else Color(0xFFD1FAE5),
           border = androidx.compose.foundation.BorderStroke(1.dp, SeaGreenBorder),
           modifier = Modifier.fillMaxWidth()
         ) {
@@ -129,18 +137,18 @@ fun CalculationHistoryView(
               verticalAlignment = Alignment.CenterVertically,
               horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-              Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SeaGreen, modifier = Modifier.size(18.dp))
+              Icon(Icons.Default.CheckCircle, contentDescription = null, tint = if (isDarkMode) SeaGreen else Color(0xFF059669), modifier = Modifier.size(18.dp))
               Text(
                 text = msg,
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.5.sp),
-                color = TextPrimary
+                color = textPrimary
               )
             }
             IconButton(
               onClick = { viewModel.clearSaveSuccessMessage() },
               modifier = Modifier.size(24.dp)
             ) {
-              Icon(Icons.Default.Close, contentDescription = null, tint = TextMuted, modifier = Modifier.size(14.dp))
+              Icon(Icons.Default.Close, contentDescription = null, tint = textMuted, modifier = Modifier.size(14.dp))
             }
           }
         }
@@ -157,11 +165,8 @@ fun CalculationHistoryView(
       // Demirleme Geçmişi Sekmesi
       Surface(
         shape = RoundedCornerShape(10.dp),
-        color = if (selectedSubTab == 0) PrimaryBlue else CardWhite,
-        border = androidx.compose.foundation.BorderStroke(
-          1.5.dp,
-          if (selectedSubTab == 0) PrimaryBlueBorder else CardBorder
-        ),
+        color = if (selectedSubTab == 0) PrimaryBlue else cardBg,
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (selectedSubTab == 0) PrimaryBlue else cardBorder),
         modifier = Modifier
           .weight(1f)
           .clickable { selectedSubTab = 0 }
@@ -177,17 +182,14 @@ fun CalculationHistoryView(
           Icon(
             imageVector = Icons.Default.Anchor,
             contentDescription = null,
-            tint = if (selectedSubTab == 0) Color.White else PrimaryBlue,
+            tint = if (selectedSubTab == 0) Color.White else (if (isDarkMode) MarineCyan else PrimaryBlue),
             modifier = Modifier.size(18.dp)
           )
           Spacer(modifier = Modifier.width(6.dp))
           Text(
             text = "Demirleme (${uiState.anchorHistory.size})",
-            style = MaterialTheme.typography.labelMedium.copy(
-              fontWeight = if (selectedSubTab == 0) FontWeight.Black else FontWeight.Bold,
-              fontSize = 12.sp,
-              color = if (selectedSubTab == 0) Color.White else TextPrimary
-            )
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+            color = if (selectedSubTab == 0) Color.White else textPrimary
           )
         }
       }
@@ -195,11 +197,8 @@ fun CalculationHistoryView(
       // Gelgit Geçmişi Sekmesi
       Surface(
         shape = RoundedCornerShape(10.dp),
-        color = if (selectedSubTab == 1) PrimaryBlue else CardWhite,
-        border = androidx.compose.foundation.BorderStroke(
-          1.5.dp,
-          if (selectedSubTab == 1) PrimaryBlueBorder else CardBorder
-        ),
+        color = if (selectedSubTab == 1) PrimaryBlue else cardBg,
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (selectedSubTab == 1) PrimaryBlue else cardBorder),
         modifier = Modifier
           .weight(1f)
           .clickable { selectedSubTab = 1 }
@@ -213,48 +212,45 @@ fun CalculationHistoryView(
           verticalAlignment = Alignment.CenterVertically
         ) {
           Icon(
-            imageVector = Icons.Default.Waves,
+            imageVector = Icons.Default.Water,
             contentDescription = null,
-            tint = if (selectedSubTab == 1) Color.White else MarineCyan,
+            tint = if (selectedSubTab == 1) Color.White else (if (isDarkMode) MarineCyan else PrimaryBlue),
             modifier = Modifier.size(18.dp)
           )
           Spacer(modifier = Modifier.width(6.dp))
           Text(
             text = "Gelgit & UKC (${uiState.tideHistory.size})",
-            style = MaterialTheme.typography.labelMedium.copy(
-              fontWeight = if (selectedSubTab == 1) FontWeight.Black else FontWeight.Bold,
-              fontSize = 12.sp,
-              color = if (selectedSubTab == 1) Color.White else TextPrimary
-            )
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+            color = if (selectedSubTab == 1) Color.White else textPrimary
           )
         }
       }
     }
 
     // ══════════════════════════════════════════════════════════════
-    // 3. LİSTE ALANI
+    // 3. LİSTE İÇERİĞİ
     // ══════════════════════════════════════════════════════════════
     if (selectedSubTab == 0) {
-      // DEMİRLEME HESAPLAMALARI LİSTESİ
+      // DEMİRLEME GEÇMİŞİ LİSTESİ
       if (uiState.anchorHistory.isEmpty()) {
         EmptyHistoryCard(
           icon = Icons.Default.Anchor,
-          title = "Henüz Kayıtlı Demirleme Hesabı Yok",
-          description = "Demirleme Parametreleri ekranından '💾 Geçmişe Kaydet' butonuna basarak hesaplamalarınızı Room veritabanında saklayabilirsiniz.",
-          buttonText = "Demirleme Hesabı Yap",
+          title = "Kayıtlı Demirleme Hesabı Yok",
+          description = "Demirleme & Kaloma ekranında yaptığınız hesaplamaları '💾 Veritabanına Kaydet' butonu ile buraya kaydedebilirsiniz.",
+          buttonText = "⚓ Demirleme Ekranına Git",
+          isDarkMode = isDarkMode,
           onButtonClick = onNavigateToAnchor
         )
       } else {
         LazyColumn(
-          modifier = Modifier
-            .fillMaxSize()
-            .testTag("list_anchor_history"),
-          verticalArrangement = Arrangement.spacedBy(10.dp),
-          contentPadding = PaddingValues(bottom = 24.dp)
+          modifier = Modifier.fillMaxSize(),
+          verticalArrangement = Arrangement.spacedBy(8.dp),
+          contentPadding = PaddingValues(bottom = 20.dp)
         ) {
           items(uiState.anchorHistory, key = { it.id }) { record ->
             AnchorHistoryItemCard(
               record = record,
+              isDarkMode = isDarkMode,
               onLoad = {
                 viewModel.loadAnchorRecordIntoForm(record)
                 onNavigateToAnchor()
@@ -265,26 +261,26 @@ fun CalculationHistoryView(
         }
       }
     } else {
-      // GELGİT HESAPLAMALARI LİSTESİ
+      // GELGİT GEÇMİŞİ LİSTESİ
       if (uiState.tideHistory.isEmpty()) {
         EmptyHistoryCard(
-          icon = Icons.Default.Waves,
-          title = "Henüz Kayıtlı Gelgit Hesabı Yok",
-          description = "Gelgit veya Seyir Raporu ekranından hesaplama sonuçlarını Room veritabanına kaydedebilirsiniz.",
-          buttonText = "Gelgit Hesabı Yap",
+          icon = Icons.Default.Water,
+          title = "Kayıtlı Gelgit Hesabı Yok",
+          description = "Gelgit & UKC Pencereleri ekranından yaptığınız seyrüsefer analizlerini buraya kaydedebilirsiniz.",
+          buttonText = "🌊 Gelgit Analizine Git",
+          isDarkMode = isDarkMode,
           onButtonClick = onNavigateToTide
         )
       } else {
         LazyColumn(
-          modifier = Modifier
-            .fillMaxSize()
-            .testTag("list_tide_history"),
-          verticalArrangement = Arrangement.spacedBy(10.dp),
-          contentPadding = PaddingValues(bottom = 24.dp)
+          modifier = Modifier.fillMaxSize(),
+          verticalArrangement = Arrangement.spacedBy(8.dp),
+          contentPadding = PaddingValues(bottom = 20.dp)
         ) {
           items(uiState.tideHistory, key = { it.id }) { record ->
             TideHistoryItemCard(
               record = record,
+              isDarkMode = isDarkMode,
               onLoad = {
                 viewModel.loadTideRecordIntoForm(record)
                 onNavigateToTide()
@@ -305,13 +301,15 @@ fun CalculationHistoryView(
       title = {
         Text(
           text = if (selectedSubTab == 0) "Demirleme Geçmişi Temizlensin mi?" else "Gelgit Geçmişi Temizlensin mi?",
-          style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+          style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+          color = textPrimary
         )
       },
       text = {
         Text(
           text = "Tüm kayıtlı ${if (selectedSubTab == 0) "demirleme" else "gelgit"} hesaplama geçmişi kalıcı olarak silinecektir. Emin misiniz?",
-          style = MaterialTheme.typography.bodyMedium
+          style = MaterialTheme.typography.bodyMedium,
+          color = textPrimary
         )
       },
       confirmButton = {
@@ -340,14 +338,22 @@ fun CalculationHistoryView(
 @Composable
 private fun AnchorHistoryItemCard(
   record: AnchorCalculationRecord,
+  isDarkMode: Boolean,
   onLoad: () -> Unit,
   onDelete: () -> Unit
 ) {
+  val cardBg = getMarineCardBg(isDarkMode)
+  val cardBorder = getMarineCardBorder(isDarkMode)
+  val subtleBg = getMarineSubtleBg(isDarkMode)
+  val subtleBorder = getMarineSubtleBorder(isDarkMode)
+  val textPrimary = getMarineTextPrimary(isDarkMode)
+  val textMuted = getMarineTextMuted(isDarkMode)
+
   Surface(
     shape = RoundedCornerShape(12.dp),
-    color = CardWhite,
+    color = cardBg,
     shadowElevation = 2.dp,
-    border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
+    border = androidx.compose.foundation.BorderStroke(1.dp, cardBorder),
     modifier = Modifier.fillMaxWidth()
   ) {
     Column(
@@ -369,12 +375,12 @@ private fun AnchorHistoryItemCard(
           if (record.vesselName.isNotBlank()) {
             Surface(
               shape = RoundedCornerShape(6.dp),
-              color = PrimaryBlueLight
+              color = if (isDarkMode) PrimaryBlueLight else Color(0xFFDBEAFE)
             ) {
               Text(
                 text = record.vesselName,
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 11.sp),
-                color = PrimaryBlueBorder,
+                color = if (isDarkMode) MarineCyan else PrimaryBlueDark,
                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
               )
             }
@@ -382,12 +388,12 @@ private fun AnchorHistoryItemCard(
 
           Surface(
             shape = RoundedCornerShape(6.dp),
-            color = CardSubtle
+            color = subtleBg
           ) {
             Text(
               text = "1 Kilit = ${String.format(Locale.US, "%.1f", record.metersPerShackle)}m",
               style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
-              color = MarineCyan,
+              color = if (isDarkMode) MarineCyan else PrimaryBlue,
               modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
             )
           }
@@ -400,7 +406,7 @@ private fun AnchorHistoryItemCard(
           Text(
             text = record.formattedDate,
             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-            color = TextMuted
+            color = textMuted
           )
           IconButton(
             onClick = onDelete,
@@ -411,7 +417,7 @@ private fun AnchorHistoryItemCard(
         }
       }
 
-      HorizontalDivider(color = CardBorder.copy(alpha = 0.5f))
+      HorizontalDivider(color = cardBorder.copy(alpha = 0.5f))
 
       // a, b, c Değerleri
       Row(
@@ -419,26 +425,26 @@ private fun AnchorHistoryItemCard(
         horizontalArrangement = Arrangement.SpaceBetween
       ) {
         Column {
-          Text("a = Kaloma / Kilit", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, color = TextMuted))
+          Text("a = Kaloma / Kilit", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, color = textMuted))
           Text(
             "${String.format(Locale.US, "%.1f", record.chainScopeMeters)} m (${String.format(Locale.US, "%.1f", record.shacklesCount)} Kilit)",
-            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Black, color = TextPrimary)
+            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Black, color = textPrimary)
           )
         }
 
         Column {
-          Text("b = Derinlik", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, color = TextMuted))
+          Text("b = Derinlik", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, color = textMuted))
           Text(
             "${String.format(Locale.US, "%.1f", record.depthMeters)} m (${String.format(Locale.US, "%.1f", record.depthMeters / 1.8288)} Ku)",
-            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = TextPrimary)
+            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = textPrimary)
           )
         }
 
         Column {
-          Text("c = Yatay Mesafe", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, color = TextMuted))
+          Text("c = Yatay Mesafe", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, color = textMuted))
           Text(
             "${String.format(Locale.US, "%.1f", record.horizontalDistanceMeters)} m",
-            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = PrimaryBlueBorder)
+            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = if (isDarkMode) MarineCyan else PrimaryBlue)
           )
         }
       }
@@ -446,8 +452,8 @@ private fun AnchorHistoryItemCard(
       // Salma Daireleri Özeti (d, e, f)
       Surface(
         shape = RoundedCornerShape(8.dp),
-        color = CardSubtle,
-        border = androidx.compose.foundation.BorderStroke(1.dp, CardSubtleBorder),
+        color = subtleBg,
+        border = androidx.compose.foundation.BorderStroke(1.dp, subtleBorder),
         modifier = Modifier.fillMaxWidth()
       ) {
         Row(
@@ -458,11 +464,11 @@ private fun AnchorHistoryItemCard(
         ) {
           Text(
             text = "d (1. Salma): ${String.format(Locale.US, "%.1f", record.firstSwingingRadiusMeters)} m",
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp, color = TextPrimary)
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp, color = textPrimary)
           )
           Text(
             text = "f (2. Salma): ${String.format(Locale.US, "%.1f", record.secondSwingingRadiusTotalMeters)} m",
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 10.sp, color = WarningAmber)
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 10.sp, color = if (isDarkMode) WarningAmber else Color(0xFFD97706))
           )
         }
       }
@@ -471,16 +477,17 @@ private fun AnchorHistoryItemCard(
       OutlinedButton(
         onClick = onLoad,
         shape = RoundedCornerShape(8.dp),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = PrimaryBlueBorder),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = if (isDarkMode) MarineCyan else PrimaryBlue),
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (isDarkMode) MarineCyan else PrimaryBlue),
         modifier = Modifier
           .fillMaxWidth()
           .height(34.dp)
       ) {
-        Icon(Icons.Default.Input, contentDescription = null, modifier = Modifier.size(14.dp), tint = PrimaryBlueBorder)
+        Icon(Icons.Default.Input, contentDescription = null, modifier = Modifier.size(14.dp), tint = if (isDarkMode) MarineCyan else PrimaryBlue)
         Spacer(modifier = Modifier.width(6.dp))
         Text(
           "Bu Parametreleri Forma Yükle ve Hesapla",
-          style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp, color = PrimaryBlueBorder)
+          style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp, color = if (isDarkMode) MarineCyan else PrimaryBlue)
         )
       }
     }
@@ -493,14 +500,22 @@ private fun AnchorHistoryItemCard(
 @Composable
 private fun TideHistoryItemCard(
   record: TideCalculationRecord,
+  isDarkMode: Boolean,
   onLoad: () -> Unit,
   onDelete: () -> Unit
 ) {
+  val cardBg = getMarineCardBg(isDarkMode)
+  val cardBorder = getMarineCardBorder(isDarkMode)
+  val subtleBg = getMarineSubtleBg(isDarkMode)
+  val subtleBorder = getMarineSubtleBorder(isDarkMode)
+  val textPrimary = getMarineTextPrimary(isDarkMode)
+  val textMuted = getMarineTextMuted(isDarkMode)
+
   Surface(
     shape = RoundedCornerShape(12.dp),
-    color = CardWhite,
+    color = cardBg,
     shadowElevation = 2.dp,
-    border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
+    border = androidx.compose.foundation.BorderStroke(1.dp, cardBorder),
     modifier = Modifier.fillMaxWidth()
   ) {
     Column(
@@ -522,18 +537,18 @@ private fun TideHistoryItemCard(
           Text(
             text = record.portName,
             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Black, fontSize = 12.5.sp),
-            color = TextPrimary
+            color = textPrimary
           )
           Surface(
             shape = RoundedCornerShape(6.dp),
-            color = if (record.isCurrentlySafe) SeaGreenDark else DangerRedDark
+            color = if (record.isCurrentlySafe) (if (isDarkMode) SeaGreenDark else Color(0xFFD1FAE5)) else (if (isDarkMode) DangerRedDark else Color(0xFFFEE2E2))
           ) {
             Text(
               text = if (record.isCurrentlySafe) "GÜVENLİ" else "DİKKAT",
               style = MaterialTheme.typography.labelSmall.copy(
                 fontWeight = FontWeight.Black,
                 fontSize = 9.sp,
-                color = if (record.isCurrentlySafe) SeaGreen else DangerRed
+                color = if (record.isCurrentlySafe) (if (isDarkMode) SeaGreen else Color(0xFF059669)) else DangerRed
               ),
               modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
             )
@@ -547,7 +562,7 @@ private fun TideHistoryItemCard(
           Text(
             text = record.formattedDate,
             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-            color = TextMuted
+            color = textMuted
           )
           IconButton(
             onClick = onDelete,
@@ -558,7 +573,7 @@ private fun TideHistoryItemCard(
         }
       }
 
-      HorizontalDivider(color = CardBorder.copy(alpha = 0.5f))
+      HorizontalDivider(color = cardBorder.copy(alpha = 0.5f))
 
       // Gelgit Değerleri Özeti
       Row(
@@ -566,28 +581,28 @@ private fun TideHistoryItemCard(
         horizontalArrangement = Arrangement.SpaceBetween
       ) {
         Column {
-          Text("Yüksek Su (HW)", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, color = TextMuted))
+          Text("Yüksek Su (HW)", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, color = textMuted))
           Text(
             "${record.highTideTime} • +${String.format(Locale.US, "%.2f", record.highTideHeightMeters)}m",
-            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = TextPrimary)
+            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = textPrimary)
           )
         }
 
         Column {
-          Text("Alçak Su (LW)", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, color = TextMuted))
+          Text("Alçak Su (LW)", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, color = textMuted))
           Text(
             "${record.lowTideTime} • +${String.format(Locale.US, "%.2f", record.lowTideHeightMeters)}m",
-            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = TextPrimary)
+            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = textPrimary)
           )
         }
 
         Column {
-          Text("Anlık UKC", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, color = TextMuted))
+          Text("Anlık UKC", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, color = textMuted))
           Text(
             "+${String.format(Locale.US, "%.2f", record.currentInstantUkcMeters)} m",
             style = MaterialTheme.typography.bodySmall.copy(
               fontWeight = FontWeight.Black,
-              color = if (record.isCurrentlySafe) SeaGreen else DangerRed
+              color = if (record.isCurrentlySafe) (if (isDarkMode) SeaGreen else Color(0xFF059669)) else DangerRed
             )
           )
         }
@@ -597,13 +612,13 @@ private fun TideHistoryItemCard(
       if (record.safeWindowSummary.isNotBlank()) {
         Surface(
           shape = RoundedCornerShape(8.dp),
-          color = CardSubtle,
-          border = androidx.compose.foundation.BorderStroke(1.dp, CardSubtleBorder),
+          color = subtleBg,
+          border = androidx.compose.foundation.BorderStroke(1.dp, subtleBorder),
           modifier = Modifier.fillMaxWidth()
         ) {
           Text(
             text = "Emniyet: ${record.safeWindowSummary}",
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, color = TextPrimary),
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, color = textPrimary),
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
           )
         }
@@ -613,16 +628,17 @@ private fun TideHistoryItemCard(
       OutlinedButton(
         onClick = onLoad,
         shape = RoundedCornerShape(8.dp),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = PrimaryBlueBorder),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = if (isDarkMode) MarineCyan else PrimaryBlue),
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (isDarkMode) MarineCyan else PrimaryBlue),
         modifier = Modifier
           .fillMaxWidth()
           .height(34.dp)
       ) {
-        Icon(Icons.Default.Input, contentDescription = null, modifier = Modifier.size(14.dp), tint = PrimaryBlueBorder)
+        Icon(Icons.Default.Input, contentDescription = null, modifier = Modifier.size(14.dp), tint = if (isDarkMode) MarineCyan else PrimaryBlue)
         Spacer(modifier = Modifier.width(6.dp))
         Text(
           "Bu Gelgit Değerlerini Aç",
-          style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp, color = PrimaryBlueBorder)
+          style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp, color = if (isDarkMode) MarineCyan else PrimaryBlue)
         )
       }
     }
@@ -638,12 +654,18 @@ private fun EmptyHistoryCard(
   title: String,
   description: String,
   buttonText: String,
+  isDarkMode: Boolean,
   onButtonClick: () -> Unit
 ) {
+  val cardBg = getMarineCardBg(isDarkMode)
+  val cardBorder = getMarineCardBorder(isDarkMode)
+  val textPrimary = getMarineTextPrimary(isDarkMode)
+  val textMuted = getMarineTextMuted(isDarkMode)
+
   Surface(
     shape = RoundedCornerShape(14.dp),
-    color = CardWhite,
-    border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
+    color = cardBg,
+    border = androidx.compose.foundation.BorderStroke(1.dp, cardBorder),
     modifier = Modifier.fillMaxWidth()
   ) {
     Column(
@@ -656,13 +678,13 @@ private fun EmptyHistoryCard(
       Box(
         modifier = Modifier
           .size(54.dp)
-          .background(PrimaryBlueLight, CircleShape),
+          .background(if (isDarkMode) PrimaryBlueLight else Color(0xFFDBEAFE), CircleShape),
         contentAlignment = Alignment.Center
       ) {
         Icon(
           imageVector = icon,
           contentDescription = null,
-          tint = MarineCyan,
+          tint = if (isDarkMode) MarineCyan else PrimaryBlueDark,
           modifier = Modifier.size(28.dp)
         )
       }
@@ -670,13 +692,13 @@ private fun EmptyHistoryCard(
       Text(
         text = title,
         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-        color = TextPrimary
+        color = textPrimary
       )
 
       Text(
         text = description,
         style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp),
-        color = TextMuted,
+        color = textMuted,
         textAlign = androidx.compose.ui.text.style.TextAlign.Center
       )
 

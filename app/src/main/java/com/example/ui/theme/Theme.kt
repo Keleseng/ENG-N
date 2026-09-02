@@ -35,30 +35,30 @@ private val ProfessionalDarkColorScheme = darkColorScheme(
 )
 
 private val ProfessionalLightColorScheme = lightColorScheme(
-  primary = PrimaryBlue,
+  primary = Color(0xFF1D4ED8),
   onPrimary = Color.White,
-  primaryContainer = PrimaryBlueLight,
-  onPrimaryContainer = PrimaryBlueDark,
-  secondary = MarineCyan,
+  primaryContainer = Color(0xFFDBEAFE),
+  onPrimaryContainer = Color(0xFF1E3A8A),
+  secondary = Color(0xFF0284C7),
   onSecondary = Color.White,
   secondaryContainer = Color(0xFFE0F2FE),
   onSecondaryContainer = Color(0xFF0369A1),
-  tertiary = SeaGreen,
+  tertiary = Color(0xFF059669),
   onTertiary = Color.White,
-  tertiaryContainer = SeaGreenLight,
-  onTertiaryContainer = SeaGreen,
-  background = BackgroundCanvas,
-  onBackground = TextPrimary,
-  surface = CardWhite,
-  onSurface = TextPrimary,
-  surfaceVariant = CardSubtle,
-  onSurfaceVariant = TextSecondary,
-  outline = CardSubtleBorder,
-  outlineVariant = CardBorder,
+  tertiaryContainer = Color(0xFFD1FAE5),
+  onTertiaryContainer = Color(0xFF065F46),
+  background = Color(0xFFF1F5F9),
+  onBackground = Color(0xFF0F172A),
+  surface = Color(0xFFFFFFFF),
+  onSurface = Color(0xFF0F172A),
+  surfaceVariant = Color(0xFFF8FAFC),
+  onSurfaceVariant = Color(0xFF475569),
+  outline = Color(0xFFCBD5E1),
+  outlineVariant = Color(0xFFE2E8F0),
   error = DangerRed,
   onError = Color.White,
-  errorContainer = DangerRedLight,
-  onErrorContainer = DangerRed
+  errorContainer = Color(0xFFFEE2E2),
+  onErrorContainer = Color(0xFF991B1B)
 )
 
 @Composable

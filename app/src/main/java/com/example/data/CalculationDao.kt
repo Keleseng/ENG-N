@@ -16,6 +16,9 @@ interface CalculationDao {
   @Query("SELECT * FROM anchor_calculations ORDER BY timestamp DESC")
   fun getAllAnchorRecords(): Flow<List<AnchorCalculationRecord>>
 
+  @Query("SELECT * FROM anchor_calculations WHERE vesselName = :vesselName AND chainScopeMeters = :chainScopeMeters AND depthMeters = :depthMeters AND metersPerShackle = :metersPerShackle LIMIT 1")
+  suspend fun findDuplicateAnchorRecord(vesselName: String, chainScopeMeters: Double, depthMeters: Double, metersPerShackle: Double): AnchorCalculationRecord?
+
   @Insert(onConflict = OnConflictStrategy.REPLACE)
   suspend fun insertAnchorRecord(record: AnchorCalculationRecord): Long
 
@@ -31,6 +34,9 @@ interface CalculationDao {
 
   @Query("SELECT * FROM tide_calculations ORDER BY timestamp DESC")
   fun getAllTideRecords(): Flow<List<TideCalculationRecord>>
+
+  @Query("SELECT * FROM tide_calculations WHERE portName = :portName AND chartDatumDepthMeters = :chartDatumDepthMeters AND shipDraftMeters = :shipDraftMeters AND requiredUkcMeters = :requiredUkcMeters LIMIT 1")
+  suspend fun findDuplicateTideRecord(portName: String, chartDatumDepthMeters: Double, shipDraftMeters: Double, requiredUkcMeters: Double): TideCalculationRecord?
 
   @Insert(onConflict = OnConflictStrategy.REPLACE)
   suspend fun insertTideRecord(record: TideCalculationRecord): Long

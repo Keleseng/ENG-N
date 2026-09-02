@@ -1,5 +1,5 @@
 {
-  "name": "Deniz Seyir & Gelgit Navigasyonu",
+  "name": "Deniz Seyir & Gelgit",
   "description": "GPS konumu, canlı rüzgar, dalga yüksekliği, basınç, bağıl nem, yağış, rüzgar hamlesi, yere göre sürat ve gelgit güvenli geçiş hesaplayıcı",
   "requestFramePermissions": [],
   "majorCapabilities": [

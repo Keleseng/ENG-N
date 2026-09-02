@@ -42,8 +42,16 @@ fun ReportView(
   modifier: Modifier = Modifier
 ) {
   val context = LocalContext.current
+  val isDarkMode = uiState.isDarkMode
   val analysis = uiState.analysis
   val scrollState = rememberScrollState()
+
+  val cardBg = getMarineCardBg(isDarkMode)
+  val cardBorder = getMarineCardBorder(isDarkMode)
+  val subtleBg = getMarineSubtleBg(isDarkMode)
+  val textPrimary = getMarineTextPrimary(isDarkMode)
+  val textSecondary = getMarineTextSecondary(isDarkMode)
+  val textMuted = getMarineTextMuted(isDarkMode)
 
   Column(
     modifier = modifier
@@ -54,16 +62,22 @@ fun ReportView(
   ) {
 
     // 0. Canlı Köprüüstü Seyir & Çevre Telemetrisi Kartı
-    BridgeTelemetryCard(analysis = analysis)
+    BridgeTelemetryCard(
+      analysis = analysis,
+      isDarkMode = isDarkMode
+    )
 
     // 1. Gerçekçi Ay Evresi & Gelgit Çekim Katsayısı Kartı
-    RealisticMoonPhaseCard(analysis = analysis)
+    RealisticMoonPhaseCard(
+      analysis = analysis,
+      isDarkMode = isDarkMode
+    )
 
     // 2. Rapor Başlık ve Kopyalama Butonu
     Card(
       shape = RoundedCornerShape(16.dp),
-      colors = CardDefaults.cardColors(containerColor = CardWhite),
-      border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
+      colors = CardDefaults.cardColors(containerColor = cardBg),
+      border = androidx.compose.foundation.BorderStroke(1.dp, cardBorder),
       elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
       modifier = Modifier.fillMaxWidth()
     ) {
@@ -80,23 +94,23 @@ fun ReportView(
             Box(
               modifier = Modifier
                 .size(36.dp)
-                .background(PrimaryBlueLight, RoundedCornerShape(10.dp)),
+                .background(if (isDarkMode) PrimaryBlueLight else Color(0xFFDBEAFE), RoundedCornerShape(10.dp)),
               contentAlignment = Alignment.Center
             ) {
-              Icon(Icons.Default.Description, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(20.dp))
+              Icon(Icons.Default.Description, contentDescription = null, tint = if (isDarkMode) MarineCyan else PrimaryBlueDark, modifier = Modifier.size(20.dp))
             }
             Spacer(modifier = Modifier.width(10.dp))
             Column {
               Text(
                 text = "Seyir & Gelgit Emniyet Raporu",
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = TextPrimary,
+                color = textPrimary,
                 softWrap = true
               )
               Text(
                 text = "${analysis.vessel.name} • ${analysis.location.name}",
                 style = MaterialTheme.typography.bodySmall,
-                color = PrimaryBlue,
+                color = if (isDarkMode) MarineCyan else PrimaryBlue,
                 softWrap = true
               )
             }
@@ -129,8 +143,8 @@ fun ReportView(
     // 3. Emniyet Kontrol Listesi
     Card(
       shape = RoundedCornerShape(16.dp),
-      colors = CardDefaults.cardColors(containerColor = CardWhite),
-      border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
+      colors = CardDefaults.cardColors(containerColor = cardBg),
+      border = androidx.compose.foundation.BorderStroke(1.dp, cardBorder),
       elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
       modifier = Modifier.fillMaxWidth()
     ) {
@@ -139,16 +153,16 @@ fun ReportView(
           Box(
             modifier = Modifier
               .size(24.dp)
-              .background(SeaGreenLight, RoundedCornerShape(6.dp)),
+              .background(if (isDarkMode) SeaGreenLight else Color(0xFFD1FAE5), RoundedCornerShape(6.dp)),
             contentAlignment = Alignment.Center
           ) {
-            Icon(Icons.Default.VerifiedUser, contentDescription = null, tint = SeaGreen, modifier = Modifier.size(16.dp))
+            Icon(Icons.Default.VerifiedUser, contentDescription = null, tint = if (isDarkMode) SeaGreen else Color(0xFF059669), modifier = Modifier.size(16.dp))
           }
           Spacer(modifier = Modifier.width(8.dp))
           Text(
             text = "Köprüüstü Emniyet Kontrol Listesi",
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            color = TextPrimary
+            color = textPrimary
           )
         }
 
@@ -164,14 +178,14 @@ fun ReportView(
             Box(
               modifier = Modifier
                 .size(20.dp)
-                .background(if (isPassed) SeaGreenLight else DangerRedLight, CircleShape)
+                .background(if (isPassed) (if (isDarkMode) SeaGreenLight else Color(0xFFD1FAE5)) else (if (isDarkMode) DangerRedLight else Color(0xFFFEE2E2)), CircleShape)
                 .border(1.dp, if (isPassed) SeaGreenBorder else DangerRedBorder, CircleShape),
               contentAlignment = Alignment.Center
             ) {
               Icon(
                 imageVector = if (isPassed) Icons.Default.Check else Icons.Default.Close,
                 contentDescription = null,
-                tint = if (isPassed) SeaGreen else DangerRed,
+                tint = if (isPassed) (if (isDarkMode) SeaGreen else Color(0xFF059669)) else DangerRed,
                 modifier = Modifier.size(13.dp)
               )
             }
@@ -179,7 +193,7 @@ fun ReportView(
             Text(
               text = itemText,
               style = MaterialTheme.typography.bodySmall.copy(lineHeight = 16.sp),
-              color = if (isPassed) TextPrimary else DangerRed,
+              color = if (isPassed) textPrimary else DangerRed,
               softWrap = true,
               modifier = Modifier.weight(1f)
             )
@@ -189,13 +203,16 @@ fun ReportView(
     }
 
     // 4. 12'ler Kuralı Tablosu
-    RuleOfTwelfthsCard(steps = analysis.ruleOfTwelfths)
+    RuleOfTwelfthsCard(
+      steps = analysis.ruleOfTwelfths,
+      isDarkMode = isDarkMode
+    )
 
     // 5. Detaylı Metin Raporu Çerçevesi
     Card(
       shape = RoundedCornerShape(16.dp),
-      colors = CardDefaults.cardColors(containerColor = CardWhite),
-      border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
+      colors = CardDefaults.cardColors(containerColor = cardBg),
+      border = androidx.compose.foundation.BorderStroke(1.dp, cardBorder),
       elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
       modifier = Modifier.fillMaxWidth()
     ) {
@@ -203,7 +220,7 @@ fun ReportView(
         Text(
           text = "Resmi Seyir, Meteoroloji ve Gelgit Bildirimi",
           style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-          color = TextMuted
+          color = textMuted
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -211,8 +228,8 @@ fun ReportView(
         Box(
           modifier = Modifier
             .fillMaxWidth()
-            .background(CardSubtle, RoundedCornerShape(8.dp))
-            .border(1.dp, CardBorder, RoundedCornerShape(8.dp))
+            .background(subtleBg, RoundedCornerShape(8.dp))
+            .border(1.dp, cardBorder, RoundedCornerShape(8.dp))
             .padding(12.dp)
         ) {
           Text(
@@ -221,7 +238,7 @@ fun ReportView(
               fontFamily = FontFamily.Monospace,
               lineHeight = 18.sp
             ),
-            color = TextSecondary
+            color = textSecondary
           )
         }
       }
@@ -248,83 +265,45 @@ private fun buildReportString(uiState: TideUiState): String {
   sb.appendLine("• Statik Draft: ${analysis.actualDraftMeters} m")
   sb.appendLine("• Seyir Hızı (STW): ${analysis.vesselSpeedKnots} knot")
   sb.appendLine("• Squat (Çökelme): ${analysis.calculatedSquatMeters} m")
-  sb.appendLine("• İstenen Min UKC: ${analysis.minUkcMeters} m")
-  sb.appendLine("• Toplam Gerekli Derinlik: ${analysis.totalRequiredDepthMeters} m")
+  val dynamicDraft = analysis.actualDraftMeters + analysis.calculatedSquatMeters
+  sb.appendLine("• Dinamik Seyir Draftı: ${String.format(java.util.Locale.US, "%.2f", dynamicDraft)} m")
+  sb.appendLine("• İstenen Emniyet Payı (UKC): ${analysis.minUkcMeters} m")
+  sb.appendLine("• Gereken Toplam Emniyetli Derinlik: ${analysis.totalRequiredDepthMeters} m")
   sb.appendLine("")
-  sb.appendLine("[KONUM & KOORDİNATLAR]")
-  sb.appendLine("• Konum/Liman: ${analysis.location.name}")
-  sb.appendLine("• Standart Deniz GPS Koordinatı: ${LocationPresets.formatMarineCoordinates(analysis.customLat, analysis.customLon)}")
-  sb.appendLine("• Enlem: ${LocationPresets.formatMarineLatitude(analysis.customLat)} | Boylam: ${LocationPresets.formatMarineLongitude(analysis.customLon)}")
-  sb.appendLine("• Harita Derinliği (CD): ${analysis.chartedDepthMeters} m")
-  if (uiState.mobEvent.isActive) {
-    val mob = uiState.mobEvent
-    sb.appendLine("🚨 [ACİL DURUM - DENİZE ADAM DÜŞTÜ (MOB) KAYDI]")
-    sb.appendLine("• MOB Zamanı: ${mob.timeFormatted}")
-    sb.appendLine("• MOB Koordinatı: ${LocationPresets.formatMarineCoordinates(mob.latitude, mob.longitude)}")
-    sb.appendLine("• Gemiye Göre Mesafe: ${String.format(java.util.Locale.US, "%.1f", mob.calculateDistanceGomina(analysis.customLat, analysis.customLon))} Gomina (${String.format(java.util.Locale.US, "%.2f", mob.calculateDistanceNm(analysis.customLat, analysis.customLon))} NM / ${mob.calculateDistanceMeters(analysis.customLat, analysis.customLon).toInt()} m)")
-    sb.appendLine("• Gemiye Göre Kerteriz: ${String.format(java.util.Locale.US, "%03d°", mob.calculateBearingDegrees(analysis.customLat, analysis.customLon))}")
-  }
-  val anchorCalc = uiState.anchorCalculationResult
-  sb.appendLine("⚓ [DEMİRLEME VE SALMA DAİRESİ HESABI (ANCHORING & SWINGING CIRCLES)]")
-  sb.appendLine("• a (Verilen Kaloma): ${anchorCalc.formattedA}")
-  sb.appendLine("• b (Derinlik): ${anchorCalc.formattedB}")
-  sb.appendLine("• c (Loçadan Demir Yerine Yatay Mesafe): ${anchorCalc.formattedC} [c = √(a² - b²)]")
-  sb.appendLine("• d (1. Salma Dairesi - Köprüüstü/Radar): ${anchorCalc.formattedD} [d = Köprüüstü-Loça + c]")
-  sb.appendLine("• e (Köprüüstü-Kıç Referans Çemberi): ${anchorCalc.formattedE} [e = Köprüüstü-Kıç + c]")
-  sb.appendLine("• f (2. Salma Dairesi - Toplam Emniyet Çemberi): ${anchorCalc.formattedF} [f = Gemi Boyu LOA + c]")
-  sb.appendLine("• Kaloma Oranı (a/b): ${String.format(java.util.Locale.US, "%.1f", anchorCalc.scopeRatio)}x (${anchorCalc.scopeStatus.labelTr})")
-  sb.appendLine("• Zemin Türü: ${uiState.anchorBottomType.displayNameTr}")
-  if (uiState.anchorEvent.isAnchored) {
-    val anchor = uiState.anchorEvent
-    val anchorDistGom = anchor.calculateDistanceGomina(analysis.customLat, analysis.customLon)
-    val isDrag = anchor.isDragging(analysis.customLat, analysis.customLon)
-    sb.appendLine("• Demir Durumu: ⚓ DEMİRDE (Nöbet Aktif)")
-    sb.appendLine("  - Demir Zamanı: ${anchor.dropTimeFormatted}")
-    sb.appendLine("  - Demir Mevkii: ${LocationPresets.formatMarineCoordinates(anchor.latitude, anchor.longitude)}")
-    sb.appendLine("  - Emniyetli Salma Sınırı: ${anchor.safeSwingingRadiusGomina} Gomina (${anchorCalc.formattedF})")
-    sb.appendLine("  - Anlık Demir Mesafesi: ${String.format(java.util.Locale.US, "%.2f", anchorDistGom)} Gomina (${anchor.calculateDistanceMeters(analysis.customLat, analysis.customLon).toInt()} m)")
-    sb.appendLine("  - Nöbet Durumu: ${if (isDrag) "DİKKAT: DEMİR TARAMA / SALMA SINIRI AŞILDI" else "GÜVENLİ SALMA ALANINDA"}")
-  }
+  sb.appendLine("[LİMAN & MEVKİ BİLGİSİ]")
+  sb.appendLine("• Mevki / Liman: ${analysis.location.name}")
+  sb.appendLine("• Harita Derinliği (Chart Datum): ${analysis.chartedDepthMeters} m")
+  sb.appendLine("• 24 Saat Maksimum Su: ${analysis.maxAvailableDepth24h} m")
+  sb.appendLine("• 24 Saat Minimum Su: ${analysis.minAvailableDepth24h} m")
   sb.appendLine("")
+  sb.appendLine("[CANLI KÖPRÜÜSTÜ TELEMETRİSİ & METEOROLOJİ]")
+  sb.appendLine("• Rüzgar Hızı: ${weather.windSpeedKnots} kn (${weather.windDirectionCardinal})")
+  sb.appendLine("• Dalga Yüksekliği: ${weather.waveHeightMeters} m")
+  sb.appendLine("• Akıntı Hızı: ${analysis.currentInfo.speedKnots} kn (${analysis.currentInfo.directionCardinal})")
+  sb.appendLine("• Barometrik Basınç: ${weather.surfacePressureHpa} hPa")
+  sb.appendLine("• Hava Durumu: ${weather.weatherConditionDescription} (${weather.seaStateDescription})")
+  sb.appendLine("• Hava Sıcaklığı: ${weather.temperatureC}°C")
   sb.appendLine("")
-  sb.appendLine("[CANLI DENİZ VE METEOROLOJİ VERİLERİ (WINDY / OPEN-METEO)]")
-  val sunTimes = weather.sunTimes ?: com.example.engine.SunCalculator.calculateSunTimes(analysis.customLat, analysis.customLon)
-  sb.appendLine("• Güneş Doğumu: ${sunTimes.sunriseFormatted} | Gün Batımı: ${sunTimes.sunsetFormatted} (Gün Işığı: ${sunTimes.daylightDurationFormatted})")
-  sb.appendLine("• Sivil Şafak: ${sunTimes.dawnCivilFormatted} | Sivil Alacakaranlık: ${sunTimes.duskCivilFormatted}")
-  sb.appendLine("• Hava Sıcaklığı: ${weather.temperatureC}°C | Bağıl Nem: %${weather.relativeHumidityPercent}")
-  sb.appendLine("• Yüzey Hava Basıncı: ${weather.surfacePressureHpa} hPa")
-  sb.appendLine("• Rüzgar Sürati & Yönü: ${weather.windSpeedKnots} kn @ ${weather.windDirectionDegrees}° (${weather.windDirectionCardinal})")
-  sb.appendLine("• Rüzgar Hamlesi (Gusts): ${weather.windGustsKnots} kn | Beaufort: ${weather.beaufortDescription}")
-  sb.appendLine("• Dalga Yüksekliği & Periyodu: ${weather.waveHeightMeters} m (${weather.wavePeriodSeconds}s) | ${weather.seaStateDescription}")
-  sb.appendLine("• Yağış Durumu: ${weather.precipitationMm} mm/h (${weather.precipitationStateText})")
-  sb.appendLine("• Genel Durum: ${weather.weatherConditionDescription}")
+  sb.appendLine("[SÜRAT & AKINTI VEKTÖR ANALİZİ]")
+  sb.appendLine("• STW (Suya Göre Hız): ${speedRes.speedThroughWaterKnots} kn")
+  sb.appendLine("• SOG (Yere Göre Hız): ${speedRes.calculatedGroundSpeedKnots} kn (GPS: ${speedRes.gpsSpeedKnots} kn)")
+  sb.appendLine("• Rota Üzerinde Hız Kazancı/Kaybı: ${if (speedRes.deltaSpeedKnots > 0) "+" else ""}${speedRes.deltaSpeedKnots} kn")
+  sb.appendLine("• Rüzgar Sürüklenme Açısı: ${speedRes.windDriftAngleDegrees}°")
+  sb.appendLine("• Akıntı Değerlendirmesi: ${speedRes.speedEvaluationText}")
   sb.appendLine("")
-  sb.appendLine("[GPS SÜRATI VE YERE GÖRE SÜRAT (SOG vs STW) VEKTÖR ANALİZİ]")
-  sb.appendLine("• GPS Sürati (SOG): ${speedRes.gpsSpeedKnots} knot (Aktif: ${if (speedRes.isGpsActive) "Evet" else "Hayır"})")
-  sb.appendLine("• Suya Göre Sürat (STW): ${speedRes.speedThroughWaterKnots} knot (Pruva: ${String.format(java.util.Locale.US, "%03d°", speedRes.vesselHeadingDegrees)})")
-  sb.appendLine("• Hesaplanmış Yere Göre Sürat: ${speedRes.calculatedGroundSpeedKnots} knot (COG: ${String.format(java.util.Locale.US, "%03d°", speedRes.groundCourseDegrees)})")
-  sb.appendLine("• Akıntı & Rüzgar Hız Kazancı/Kaybı: ${if (speedRes.deltaSpeedKnots > 0) "+" else ""}${speedRes.deltaSpeedKnots} knot")
-  sb.appendLine("• Vektörel Değerlendirme: ${speedRes.speedEvaluationText}")
-  sb.appendLine("• Sürüklenme / Sapma: ${speedRes.driftStatusText}")
-  sb.appendLine("")
-  sb.appendLine("[ANLIK KÖPRÜÜSTÜ TELEMETRİSİ & DERİNLİK HESABI]")
-  sb.appendLine("• Mevki Harita Derinliği (CD): ${analysis.chartedDepthMeters} m")
-  sb.appendLine("• Anlık Gelgit Yüksekliği: +${analysis.currentInstantTideHeightMeters} m")
-  sb.appendLine("• HESAPLANAN ANLIK GERÇEK SU DERİNLİĞİ: ${analysis.currentInstantTotalDepthMeters} m")
-  sb.appendLine("• Anlık Net UKC (Omurga Altı Emniyeti): +${analysis.currentInstantUkcMeters} m (${if (analysis.isCurrentlySafe) "GÜVENLİ" else "YETERSİZ/RİSKLİ"})")
-  sb.appendLine("")
-  sb.appendLine("[GÜVENLİ GİRİŞ - ÇIKIŞ PENCERELERİ]")
+  sb.appendLine("[GÜVENLİ GEÇİŞ PENCERELERİ]")
   if (analysis.safeWindows.isEmpty()) {
-    sb.appendLine("UYARI: 24 saat içinde güvenli geçiş penceresi bulunamamıştır!")
+    sb.appendLine("• UYARI: Önümüzdeki 24 saat içinde güvenli geçiş penceresi BULUNMAMAKTADIR.")
   } else {
-    analysis.safeWindows.forEach { w ->
-      sb.appendLine("• Pencere #${w.id}: ${w.startTimeFormatted} - ${w.endTimeFormatted} (${w.durationMinutes} dk)")
-      sb.appendLine("  - Pik Zamanı: ${w.peakTimeFormatted} (Su: ${w.maxWaterDepthMeters} m, UKC: +${w.maxUkcMeters} m)")
+    analysis.safeWindows.forEachIndexed { i, win ->
+      sb.appendLine("  ${i + 1}. Pencere: ${win.startTimeFormatted} - ${win.endTimeFormatted} (Süre: ${win.durationMinutes} dk)")
+      sb.appendLine("     Pik HW: ${win.peakTimeFormatted} | Maks Su: ${win.maxWaterDepthMeters}m | Maks UKC: +${win.maxUkcMeters}m | Durum: ${win.rating.name}")
     }
   }
   sb.appendLine("")
-  sb.appendLine("[SEYİR TAVSİYESİ]")
-  sb.appendLine("${analysis.advisoryBadge}: ${analysis.advisorySummary}")
+  sb.appendLine("[EMNİYET ÖZETİ]")
+  sb.appendLine(analysis.advisorySummary)
   sb.appendLine("==========================================")
+
   return sb.toString()
 }

@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -42,7 +43,8 @@ class MainActivity : ComponentActivity() {
     enableEdgeToEdge()
 
     setContent {
-      MyApplicationTheme {
+      val uiState by viewModel.uiState.collectAsState()
+      MyApplicationTheme(darkTheme = uiState.isDarkMode) {
         var showSplash by rememberSaveable { mutableStateOf(true) }
 
         // Otomatik Konum İzni İsteme & Sürekli Güncelleme Başlatma

@@ -34,8 +34,17 @@ fun TideWindowsView(
   viewModel: TideNavViewModel,
   modifier: Modifier = Modifier
 ) {
+  val isDarkMode = uiState.isDarkMode
   val analysis = uiState.analysis
   val bestWindow = analysis.safeWindows.maxByOrNull { it.maxUkcMeters }
+
+  val cardBg = getMarineCardBg(isDarkMode)
+  val cardBorder = getMarineCardBorder(isDarkMode)
+  val subtleBg = getMarineSubtleBg(isDarkMode)
+  val subtleBorder = getMarineSubtleBorder(isDarkMode)
+  val textPrimary = getMarineTextPrimary(isDarkMode)
+  val textSecondary = getMarineTextSecondary(isDarkMode)
+  val textMuted = getMarineTextMuted(isDarkMode)
 
   LazyColumn(
     modifier = modifier
@@ -47,12 +56,18 @@ fun TideWindowsView(
 
     // 0. Canlı Köprüüstü Seyir & Çevre Telemetrisi Kartı
     item {
-      BridgeTelemetryCard(analysis = analysis)
+      BridgeTelemetryCard(
+        analysis = analysis,
+        isDarkMode = isDarkMode
+      )
     }
 
     // 1. Gerçekçi Ay Evresi & Gelgit Çekim Katsayısı Kartı
     item {
-      RealisticMoonPhaseCard(analysis = analysis)
+      RealisticMoonPhaseCard(
+        analysis = analysis,
+        isDarkMode = isDarkMode
+      )
     }
 
     // 2. Canlı Seyir ve Güvenlik Tavsiyesi Başlığı
@@ -60,7 +75,7 @@ fun TideWindowsView(
       Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-          containerColor = if (analysis.isCurrentlySafe) SeaGreenLight else DangerRedLight
+          containerColor = if (analysis.isCurrentlySafe) (if (isDarkMode) SeaGreenDark else Color(0xFFD1FAE5)) else (if (isDarkMode) DangerRedDark else Color(0xFFFEE2E2))
         ),
         border = androidx.compose.foundation.BorderStroke(
           1.dp,
@@ -80,7 +95,7 @@ fun TideWindowsView(
               modifier = Modifier
                 .size(36.dp)
                 .background(
-                  if (analysis.isCurrentlySafe) SeaGreen else DangerRed,
+                  if (analysis.isCurrentlySafe) (if (isDarkMode) SeaGreen else Color(0xFF059669)) else DangerRed,
                   CircleShape
                 ),
               contentAlignment = Alignment.Center
@@ -96,7 +111,7 @@ fun TideWindowsView(
             Text(
               text = analysis.advisoryBadge,
               style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.ExtraBold),
-              color = if (analysis.isCurrentlySafe) SeaGreen else DangerRed,
+              color = if (analysis.isCurrentlySafe) (if (isDarkMode) SeaGreen else Color(0xFF065F46)) else DangerRed,
               softWrap = true,
               modifier = Modifier.weight(1f)
             )
@@ -107,7 +122,7 @@ fun TideWindowsView(
           Text(
             text = analysis.advisorySummary,
             style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
-            color = TextPrimary,
+            color = textPrimary,
             softWrap = true
           )
 
@@ -116,7 +131,7 @@ fun TideWindowsView(
           Button(
             onClick = { viewModel.saveCurrentTideCalculation() },
             colors = ButtonDefaults.buttonColors(
-              containerColor = if (analysis.isCurrentlySafe) SeaGreen else DangerRed,
+              containerColor = if (analysis.isCurrentlySafe) (if (isDarkMode) SeaGreen else Color(0xFF059669)) else DangerRed,
               contentColor = Color.White
             ),
             shape = RoundedCornerShape(10.dp),
@@ -158,8 +173,8 @@ fun TideWindowsView(
         Card(
           modifier = Modifier.weight(1f),
           shape = RoundedCornerShape(16.dp),
-          colors = CardDefaults.cardColors(containerColor = CardWhite),
-          border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
+          colors = CardDefaults.cardColors(containerColor = cardBg),
+          border = androidx.compose.foundation.BorderStroke(1.dp, cardBorder),
           elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
           Column(modifier = Modifier.padding(14.dp)) {
@@ -167,16 +182,16 @@ fun TideWindowsView(
               Box(
                 modifier = Modifier
                   .size(24.dp)
-                  .background(PrimaryBlueLight, RoundedCornerShape(6.dp)),
+                  .background(if (isDarkMode) PrimaryBlueLight else Color(0xFFDBEAFE), RoundedCornerShape(6.dp)),
                 contentAlignment = Alignment.Center
               ) {
-                Icon(Icons.Default.ArrowUpward, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.ArrowUpward, contentDescription = null, tint = if (isDarkMode) MarineCyan else PrimaryBlueDark, modifier = Modifier.size(16.dp))
               }
               Spacer(modifier = Modifier.width(6.dp))
               Text(
                 text = "Yüksek Su (HW)",
                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                color = PrimaryBlue
+                color = if (isDarkMode) MarineCyan else PrimaryBlue
               )
             }
             Spacer(modifier = Modifier.height(10.dp))
@@ -187,12 +202,12 @@ fun TideWindowsView(
                   horizontalArrangement = Arrangement.SpaceBetween,
                   verticalAlignment = Alignment.CenterVertically
                 ) {
-                  Text(text = hw.timeFormatted, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = TextPrimary)
-                  Text(text = "+${hw.tideHeightMeters}m", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = PrimaryBlue)
+                  Text(text = hw.timeFormatted, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = textPrimary)
+                  Text(text = "+${hw.tideHeightMeters}m", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = if (isDarkMode) MarineCyan else PrimaryBlue)
                 }
               }
             } else {
-              Text("Maks: ${analysis.maxTideHeight24h}m", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+              Text("Maks: ${analysis.maxTideHeight24h}m", style = MaterialTheme.typography.bodySmall, color = textMuted)
             }
           }
         }
@@ -201,8 +216,8 @@ fun TideWindowsView(
         Card(
           modifier = Modifier.weight(1f),
           shape = RoundedCornerShape(16.dp),
-          colors = CardDefaults.cardColors(containerColor = CardWhite),
-          border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
+          colors = CardDefaults.cardColors(containerColor = cardBg),
+          border = androidx.compose.foundation.BorderStroke(1.dp, cardBorder),
           elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
           Column(modifier = Modifier.padding(14.dp)) {
@@ -210,16 +225,16 @@ fun TideWindowsView(
               Box(
                 modifier = Modifier
                   .size(24.dp)
-                  .background(WarningAmberLight, RoundedCornerShape(6.dp)),
+                  .background(if (isDarkMode) WarningAmberLight else Color(0xFFFEF3C7), RoundedCornerShape(6.dp)),
                 contentAlignment = Alignment.Center
               ) {
-                Icon(Icons.Default.ArrowDownward, contentDescription = null, tint = WarningAmber, modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.ArrowDownward, contentDescription = null, tint = if (isDarkMode) WarningAmber else Color(0xFFD97706), modifier = Modifier.size(16.dp))
               }
               Spacer(modifier = Modifier.width(6.dp))
               Text(
                 text = "Alçak Su (LW)",
                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                color = WarningAmber
+                color = if (isDarkMode) WarningAmber else Color(0xFFD97706)
               )
             }
             Spacer(modifier = Modifier.height(10.dp))
@@ -230,12 +245,12 @@ fun TideWindowsView(
                   horizontalArrangement = Arrangement.SpaceBetween,
                   verticalAlignment = Alignment.CenterVertically
                 ) {
-                  Text(text = lw.timeFormatted, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = TextPrimary)
-                  Text(text = "${if (lw.tideHeightMeters >= 0) "+" else ""}${lw.tideHeightMeters}m", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = WarningAmber)
+                  Text(text = lw.timeFormatted, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = textPrimary)
+                  Text(text = "${if (lw.tideHeightMeters >= 0) "+" else ""}${lw.tideHeightMeters}m", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = if (isDarkMode) WarningAmber else Color(0xFFD97706))
                 }
               }
             } else {
-              Text("Min: ${analysis.minTideHeight24h}m", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+              Text("Min: ${analysis.minTideHeight24h}m", style = MaterialTheme.typography.bodySmall, color = textMuted)
             }
           }
         }
@@ -253,12 +268,12 @@ fun TideWindowsView(
           Text(
             text = "Önerilen Güvenli Giriş - Çıkış Saatleri",
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            color = TextPrimary
+            color = textPrimary
           )
           Text(
             text = "${analysis.safeWindows.size} uygun geçiş penceresi tespit edildi",
             style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary
+            color = textSecondary
           )
         }
       }
@@ -269,7 +284,7 @@ fun TideWindowsView(
       item {
         Card(
           shape = RoundedCornerShape(16.dp),
-          colors = CardDefaults.cardColors(containerColor = CardWhite),
+          colors = CardDefaults.cardColors(containerColor = cardBg),
           border = androidx.compose.foundation.BorderStroke(1.dp, DangerRedBorder),
           elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
           modifier = Modifier.fillMaxWidth()
@@ -283,7 +298,7 @@ fun TideWindowsView(
             Box(
               modifier = Modifier
                 .size(52.dp)
-                .background(DangerRedLight, CircleShape),
+                .background(if (isDarkMode) DangerRedLight else Color(0xFFFEE2E2), CircleShape),
               contentAlignment = Alignment.Center
             ) {
               Icon(Icons.Default.Dangerous, contentDescription = null, tint = DangerRed, modifier = Modifier.size(32.dp))
@@ -298,7 +313,7 @@ fun TideWindowsView(
             Text(
               text = "Gemi draftı (${analysis.actualDraftMeters}m) ve minimum güvenlik payı (${analysis.minUkcMeters}m) için gereken derinlik (${analysis.totalRequiredDepthMeters}m), bölgedeki maksimum su seviyesini (${analysis.maxAvailableDepth24h}m) aşmaktadır.",
               style = MaterialTheme.typography.bodySmall,
-              color = TextSecondary,
+              color = textSecondary,
               textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
           }
@@ -308,7 +323,8 @@ fun TideWindowsView(
       items(analysis.safeWindows, key = { it.id }) { window ->
         SafeWindowCard(
           window = window,
-          isRecommendedBest = window.id == bestWindow?.id
+          isRecommendedBest = window.id == bestWindow?.id,
+          isDarkMode = isDarkMode
         )
       }
     }
@@ -319,7 +335,7 @@ fun TideWindowsView(
       Text(
         text = "Dinamik Gemi Su Altı Kesiti & Squat Analizi",
         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-        color = TextPrimary
+        color = textPrimary
       )
     }
 
@@ -334,8 +350,8 @@ fun TideWindowsView(
     item {
       Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CardWhite),
-        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
+        colors = CardDefaults.cardColors(containerColor = cardBg),
+        border = androidx.compose.foundation.BorderStroke(1.dp, cardBorder),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier.fillMaxWidth().testTag("squat_simulation_card")
       ) {
@@ -349,22 +365,22 @@ fun TideWindowsView(
               Box(
                 modifier = Modifier
                   .size(32.dp)
-                  .background(WarningAmberLight, RoundedCornerShape(8.dp)),
+                  .background(if (isDarkMode) WarningAmberLight else Color(0xFFFEF3C7), RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center
               ) {
-                Icon(Icons.Default.Speed, contentDescription = null, tint = WarningAmber, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Speed, contentDescription = null, tint = if (isDarkMode) WarningAmber else Color(0xFFD97706), modifier = Modifier.size(18.dp))
               }
               Spacer(modifier = Modifier.width(10.dp))
               Column {
                 Text(
                   text = "Kanal Hızı & Hidrodinamik Squat",
                   style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                  color = TextPrimary
+                  color = textPrimary
                 )
                 Text(
                   text = "Sığ sularda hız arttıkça gemi tabana çöker",
                   style = MaterialTheme.typography.bodySmall,
-                  color = TextSecondary
+                  color = textSecondary
                 )
               }
             }
@@ -382,17 +398,17 @@ fun TideWindowsView(
             Text(
               text = "Kanal Seyir Hızı:",
               style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-              color = TextPrimary
+              color = textPrimary
             )
             Surface(
               shape = RoundedCornerShape(6.dp),
-              color = PrimaryBlueLight,
+              color = if (isDarkMode) PrimaryBlueLight else Color(0xFFDBEAFE),
               border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryBlueBorder)
             ) {
               Text(
                 text = "${String.format(java.util.Locale.US, "%.1f", speedVal)} knot",
                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.ExtraBold),
-                color = PrimaryBlue,
+                color = if (isDarkMode) MarineCyan else PrimaryBlueDark,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
               )
             }
@@ -404,9 +420,9 @@ fun TideWindowsView(
             valueRange = 2f..14f,
             steps = 11,
             colors = SliderDefaults.colors(
-              thumbColor = PrimaryBlue,
-              activeTrackColor = PrimaryBlue,
-              inactiveTrackColor = CardSubtleBorder
+              thumbColor = if (isDarkMode) MarineCyan else PrimaryBlue,
+              activeTrackColor = if (isDarkMode) MarineCyan else PrimaryBlue,
+              inactiveTrackColor = subtleBorder
             ),
             modifier = Modifier.testTag("speed_slider")
           )
@@ -422,24 +438,28 @@ fun TideWindowsView(
               speed = "4 knot",
               squat = "${String.format(java.util.Locale.US, "%.2f", 2 * analysis.vessel.blockCoefficient * (16.0 / 100.0))}m",
               isCurrent = speedVal in 3.5f..4.5f,
+              isDarkMode = isDarkMode,
               modifier = Modifier.weight(1f)
             )
             SquatSpeedStepCard(
               speed = "6 knot",
               squat = "${String.format(java.util.Locale.US, "%.2f", 2 * analysis.vessel.blockCoefficient * (36.0 / 100.0))}m",
               isCurrent = speedVal in 5.5f..6.5f,
+              isDarkMode = isDarkMode,
               modifier = Modifier.weight(1f)
             )
             SquatSpeedStepCard(
               speed = "8 knot",
               squat = "${String.format(java.util.Locale.US, "%.2f", 2 * analysis.vessel.blockCoefficient * (64.0 / 100.0))}m",
               isCurrent = speedVal in 7.5f..8.5f,
+              isDarkMode = isDarkMode,
               modifier = Modifier.weight(1f)
             )
             SquatSpeedStepCard(
               speed = "10 knot",
               squat = "${String.format(java.util.Locale.US, "%.2f", 2 * analysis.vessel.blockCoefficient * (100.0 / 100.0))}m",
               isCurrent = speedVal in 9.5f..10.5f,
+              isDarkMode = isDarkMode,
               modifier = Modifier.weight(1f)
             )
           }
@@ -454,17 +474,24 @@ private fun SquatSpeedStepCard(
   speed: String,
   squat: String,
   isCurrent: Boolean,
+  isDarkMode: Boolean,
   modifier: Modifier = Modifier
 ) {
+  val cardBg = getMarineCardBg(isDarkMode)
+  val subtleBg = getMarineSubtleBg(isDarkMode)
+  val cardBorder = getMarineCardBorder(isDarkMode)
+  val textPrimary = getMarineTextPrimary(isDarkMode)
+  val textMuted = getMarineTextMuted(isDarkMode)
+
   Column(
     modifier = modifier
       .background(
-        if (isCurrent) PrimaryBlueLight else CardSubtle,
+        if (isCurrent) (if (isDarkMode) PrimaryBlueLight else Color(0xFFDBEAFE)) else subtleBg,
         RoundedCornerShape(8.dp)
       )
       .border(
         1.dp,
-        if (isCurrent) PrimaryBlueBorder else CardBorder,
+        if (isCurrent) PrimaryBlueBorder else cardBorder,
         RoundedCornerShape(8.dp)
       )
       .padding(6.dp),
@@ -473,12 +500,12 @@ private fun SquatSpeedStepCard(
     Text(
       text = speed,
       style = MaterialTheme.typography.labelSmall,
-      color = if (isCurrent) PrimaryBlue else TextMuted
+      color = if (isCurrent) (if (isDarkMode) MarineCyan else PrimaryBlueDark) else textMuted
     )
     Text(
       text = squat,
       style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-      color = if (isCurrent) PrimaryBlue else TextPrimary
+      color = if (isCurrent) (if (isDarkMode) MarineCyan else PrimaryBlueDark) else textPrimary
     )
   }
 }

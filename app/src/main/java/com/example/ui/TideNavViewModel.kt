@@ -78,7 +78,16 @@ data class TideUiState(
   val analysis: NavigationAnalysis = calculateInitialAnalysis(),
   val anchorHistory: List<AnchorCalculationRecord> = emptyList(),
   val tideHistory: List<TideCalculationRecord> = emptyList(),
-  val saveSuccessMessage: String? = null
+  val saveSuccessMessage: String? = null,
+  val isDarkMode: Boolean = true,
+  val activeMapLayer: MarineMapLayer = MarineMapLayer.VESSEL_FINDER,
+  val trackHistory: List<VesselTrackPoint> = emptyList(),
+  val isAutoFollowShip: Boolean = true,
+  val isShowRangeRings: Boolean = true,
+  val isShowSpeedVector: Boolean = true,
+  val speedVectorMinutes: Int = 12,
+  val isMeasureRulerActive: Boolean = false,
+  val isNightChartMode: Boolean = true
 )
 
 private fun calculateInitialAnchorResult(): AnchorCalculationResult {
@@ -508,10 +517,12 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
     val lonFormatted = String.format(Locale.US, "%.5f", data.longitude)
     val sogFormatted = String.format(Locale.US, "%.1f", data.sogKnots)
     val headingFormatted = String.format(Locale.US, "%03d", data.headingDegrees)
+    val bridgeToHawse = String.format(Locale.US, "%.1f", (data.loaMeters * 0.25).coerceAtLeast(10.0))
+    val bridgeToStern = String.format(Locale.US, "%.1f", (data.loaMeters * 0.75).coerceAtLeast(20.0))
 
     _uiState.update { current ->
       val updated = current.copy(
-        vesselName = data.name,
+        vesselName = data.name.ifBlank { "NB252" },
         mmsiStr = data.mmsi,
         imoStr = data.imo,
         callSignStr = data.callSign,
@@ -519,6 +530,9 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
         loaStr = data.loaMeters.toString(),
         beamStr = data.beamMeters.toString(),
         draftStr = data.draftMeters.toString(),
+        anchorLoaStr = data.loaMeters.toString(),
+        anchorBridgeToHawseStr = bridgeToHawse,
+        anchorBridgeToSternStr = bridgeToStern,
         latStr = latFormatted,
         lonStr = lonFormatted,
         speedStr = sogFormatted,
@@ -528,12 +542,51 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
         activeAisVesselData = data
       )
       val speedRes = computeSpeedCalculation(updated)
+      val anchorRes = computeAnchorCalculation(updated)
       updated.copy(
         analysis = computeAnalysis(updated),
-        speedCalculationResult = speedRes
+        speedCalculationResult = speedRes,
+        anchorCalculationResult = anchorRes
       )
     }
     refreshWeather()
+  }
+
+  /**
+   * NB252 (MMSI: 222111447) Askeri Gemisinin Canlı AIS / Demirleme Mevki ve Gemi Parametrelerini Alır.
+   */
+  fun loadNb252AnchorParameters() {
+    viewModelScope.launch {
+      _uiState.update { it.copy(isAisLoading = true, aisErrorMessage = null) }
+      val shipData = com.example.engine.AisTrackingEngine.getNb252ShipData()
+      applyAisVesselData(shipData)
+      _uiState.update { current ->
+        val bridgeToHawse = String.format(Locale.US, "%.1f", shipData.loaMeters * 0.25)
+        val bridgeToStern = String.format(Locale.US, "%.1f", shipData.loaMeters * 0.75)
+        val updated = current.copy(
+          isAisLoading = false,
+          isMmsiTrackingActive = true,
+          activeAisVesselData = shipData,
+          anchorLoaStr = shipData.loaMeters.toString(),
+          anchorBridgeToHawseStr = bridgeToHawse,
+          anchorBridgeToSternStr = bridgeToStern,
+          anchorDepthStr = "40.0",
+          anchorChainShacklesStr = "5.0",
+          anchorChainScopeStr = "137.5",
+          anchorEvent = if (current.anchorEvent.isAnchored) {
+            current.anchorEvent.copy(
+              latitude = shipData.latitude,
+              longitude = shipData.longitude
+            )
+          } else {
+            current.anchorEvent
+          },
+          aisSuccessMessage = "⚓ NB252 (MMSI: 222111447) Demirleme Koordinatları (${LocationPresets.formatMarineCoordinates(shipData.latitude, shipData.longitude)}) ve Gemi Parametreleri Yüklendi!"
+        )
+        val anchorRes = computeAnchorCalculation(updated)
+        updated.copy(anchorCalculationResult = anchorRes)
+      }
+    }
   }
 
   /**
@@ -614,6 +667,19 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
         current.headingDegreesStr
       }
 
+      val speedVal = fix.speedKnots ?: (speedStrUpdated.toDoubleOrNull() ?: 0.0)
+      val headingVal = fix.bearingDegrees?.toInt() ?: (headingStrUpdated.toIntOrNull() ?: 0)
+      val timeNow = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
+      val newPoint = VesselTrackPoint(
+        latitude = fix.latitude,
+        longitude = fix.longitude,
+        speedKnots = speedVal,
+        headingDegrees = headingVal,
+        timestampEpochMs = System.currentTimeMillis(),
+        timeFormatted = timeNow
+      )
+      val updatedTrack = (current.trackHistory + newPoint).takeLast(500)
+
       val updated = current.copy(
         isGpsLoading = false,
         isGpsActive = true,
@@ -625,7 +691,8 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
         isCustomPort = true,
         gpsNearestPortInfo = nearestLocationName,
         gpsSuccessMessage = successMsg,
-        gpsErrorMessage = null
+        gpsErrorMessage = null,
+        trackHistory = updatedTrack
       )
       val speedRes = computeSpeedCalculation(updated)
       updated.copy(
@@ -669,7 +736,7 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
     _uiState.update {
       it.copy(
         mobEvent = MobEvent(isActive = false),
-        gpsSuccessMessage = "MOB alarmı kapatıldı / kurtarma sonlandırıldı."
+        gpsSuccessMessage = "MOB alarmı kapatıldı / normal seyir moduna dönüldü."
       )
     }
   }
@@ -1060,4 +1127,69 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
       selectedCalendar = cal
     )
   }
+
+  fun toggleDarkMode() {
+    _uiState.update { it.copy(isDarkMode = !it.isDarkMode) }
+  }
+
+  fun setDarkMode(enabled: Boolean) {
+    _uiState.update { it.copy(isDarkMode = enabled) }
+  }
+
+  fun setActiveMapLayer(layer: MarineMapLayer) {
+    _uiState.update { it.copy(activeMapLayer = layer) }
+  }
+
+  fun toggleAutoFollowShip() {
+    _uiState.update { it.copy(isAutoFollowShip = !it.isAutoFollowShip) }
+  }
+
+  fun setAutoFollowShip(enabled: Boolean) {
+    _uiState.update { it.copy(isAutoFollowShip = enabled) }
+  }
+
+  fun toggleRangeRings() {
+    _uiState.update { it.copy(isShowRangeRings = !it.isShowRangeRings) }
+  }
+
+  fun toggleSpeedVector() {
+    _uiState.update { it.copy(isShowSpeedVector = !it.isShowSpeedVector) }
+  }
+
+  fun setSpeedVectorMinutes(minutes: Int) {
+    _uiState.update { it.copy(speedVectorMinutes = minutes) }
+  }
+
+  fun toggleMeasureRuler() {
+    _uiState.update { it.copy(isMeasureRulerActive = !it.isMeasureRulerActive) }
+  }
+
+  fun toggleNightChartMode() {
+    _uiState.update { it.copy(isNightChartMode = !it.isNightChartMode) }
+  }
+
+  fun clearTrackHistory() {
+    _uiState.update { it.copy(trackHistory = emptyList()) }
+  }
+
+  fun addManualTrackPoint() {
+    val lat = _uiState.value.latStr.toDoubleOrNull() ?: _uiState.value.selectedPort.latitude
+    val lon = _uiState.value.lonStr.toDoubleOrNull() ?: _uiState.value.selectedPort.longitude
+    val speed = _uiState.value.speedStr.toDoubleOrNull() ?: 0.0
+    val heading = _uiState.value.headingDegreesStr.toIntOrNull() ?: 0
+    val timeNow = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
+
+    val pt = VesselTrackPoint(
+      latitude = lat,
+      longitude = lon,
+      speedKnots = speed,
+      headingDegrees = heading,
+      timestampEpochMs = System.currentTimeMillis(),
+      timeFormatted = timeNow
+    )
+    _uiState.update {
+      it.copy(trackHistory = (it.trackHistory + pt).takeLast(500))
+    }
+  }
 }
+

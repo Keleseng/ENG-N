@@ -56,11 +56,37 @@ val TextNavyAccent = Color(0xFF93C5FD)        // Açık Mavi Metin Vurgusu
 val TextBlueAccent = Color(0xFF60A5FA)        // Parlak Mavi Vurgu
 val TextWhite = Color(0xFFFFFFFF)
 
+// Girilecek Bilgiler ve Zorunlu Alanlar İçin Fosforlu Sarı Renk Paleti (Yellow Input Characters)
+val MarineYellow = Color(0xFFFDE047)          // Parlak Fosforlu Sarı (Girilecek Karakterler)
+val MarineYellowBold = Color(0xFFFACC15)      // Canlı Altın Sarısı
+val MarineYellowText = Color(0xFFFEF08A)      // Yüksek Kontrastlı Açık Sarı Metin
+val MarineYellowBorder = Color(0xFFEAB308)    // Sarı / Kehribar Giriş Çerçevesi
+val MarineYellowBg = Color(0xFF1E1A04)        // Koyu Sarımsı Giriş Arka Planı
+val MarineYellowBadgeBg = Color(0xFF422006)   // Sarı Rozet Arka Planı
+
 // Gece Grafikleri & Eğri Renkleri
 val ChartGrid = Color(0xFF1E293B)             // Slate-800 Izgara Çizgisi
 val WaterFillGradientTop = Color(0x603B82F6)   // Su Doldurma Üst Gradyan (%38 Mavi)
 val WaterFillGradientBottom = Color(0x153B82F6)// Su Doldurma Alt Gradyan
 val SafeZoneFill = Color(0x3010B981)          // Emniyet Alanı (%18 Zümrüt)
 val UnsafeZoneFill = Color(0x30EF4444)        // Tehlike Alanı (%18 Kırmızı)
+
+// ════════════════════════════════════════════════════════════════════════════
+// BELİRGİN GECE / GÜNDÜZ MODU DİNAMİK RENK FONKSİYONLARI (HIGH CONTRAST)
+// ════════════════════════════════════════════════════════════════════════════
+fun getMarineCanvasBg(isDark: Boolean) = if (isDark) Color(0xFF070E1B) else Color(0xFFF1F5F9)
+fun getMarineCardBg(isDark: Boolean) = if (isDark) Color(0xFF0F1B2F) else Color(0xFFFFFFFF)
+fun getMarineCardBorder(isDark: Boolean) = if (isDark) Color(0xFF1E355B) else Color(0xFFCBD5E1)
+fun getMarineSubtleBg(isDark: Boolean) = if (isDark) Color(0xFF14243F) else Color(0xFFF8FAFC)
+fun getMarineSubtleBorder(isDark: Boolean) = if (isDark) Color(0xFF244473) else Color(0xFFE2E8F0)
+fun getMarineHeaderBg(isDark: Boolean) = if (isDark) Color(0xFF040A14) else Color(0xFF0284C7)
+fun getMarineNavBg(isDark: Boolean) = if (isDark) Color(0xFF091322) else Color(0xFFFFFFFF)
+fun getMarineTextPrimary(isDark: Boolean) = if (isDark) Color(0xFFF8FAFC) else Color(0xFF0F172A)
+fun getMarineTextSecondary(isDark: Boolean) = if (isDark) Color(0xFFCBD5E1) else Color(0xFF334155)
+fun getMarineTextMuted(isDark: Boolean) = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
+fun getMarineInputBg(isDark: Boolean) = if (isDark) Color(0xFF0B1322) else Color(0xFFFFFBEB)
+fun getMarineInputBorder(isDark: Boolean) = if (isDark) Color(0xFFEAB308) else Color(0xFFD97706)
+fun getMarineInputLabel(isDark: Boolean) = if (isDark) Color(0xFFFDE047) else Color(0xFF92400E)
+fun getMarineInputTextColor(isDark: Boolean) = if (isDark) Color(0xFFFEF08A) else Color(0xFF78350F)
 
 

@@ -8,6 +8,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Air
+import androidx.compose.material.icons.outlined.Air
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -92,7 +94,59 @@ fun MainScreen(
         ) {
           Spacer(modifier = Modifier.weight(1f))
 
-          // TAB 0: PARAMETRELER
+          // 4. WINDY
+          NavigationRailItem(
+            selected = uiState.selectedTabIndex == 3,
+            onClick = { viewModel.setTab(3) },
+            icon = {
+              Icon(
+                imageVector = if (uiState.selectedTabIndex == 3) Icons.Filled.Air else Icons.Outlined.Air,
+                contentDescription = "Windy"
+              )
+            },
+            label = {
+              Text(
+                "Windy",
+                fontSize = 11.sp,
+                fontWeight = if (uiState.selectedTabIndex == 3) FontWeight.ExtraBold else FontWeight.Medium
+              )
+            },
+            colors = railItemColors(),
+            modifier = Modifier.testTag("rail_tab_windy")
+          )
+          // 1. CANLI HARİTA (MarineTraffic AIS)
+          NavigationRailItem(
+            selected = uiState.selectedTabIndex == 4,
+            onClick = { viewModel.setTab(4) },
+            icon = {
+              BadgedBox(
+                badge = {
+                  Badge(
+                    containerColor = SeaGreen,
+                    contentColor = Color.White
+                  ) {
+                    Text("AIS", fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                  }
+                }
+              ) {
+                Icon(
+                  imageVector = if (uiState.selectedTabIndex == 4) Icons.Filled.Map else Icons.Outlined.Map,
+                  contentDescription = "Canlı Harita"
+                )
+              }
+            },
+            label = {
+              Text(
+                "Harita",
+                fontSize = 11.sp,
+                fontWeight = if (uiState.selectedTabIndex == 4) FontWeight.ExtraBold else FontWeight.Medium
+              )
+            },
+            colors = railItemColors(),
+            modifier = Modifier.testTag("rail_tab_map")
+          )
+
+          // 2. SEYİR PARAMETRELERİ
           NavigationRailItem(
             selected = uiState.selectedTabIndex == 0,
             onClick = { viewModel.setTab(0) },
@@ -113,15 +167,28 @@ fun MainScreen(
             modifier = Modifier.testTag("rail_tab_params")
           )
 
-          // TAB 1: DEMİRLEME
+          // 3. DEMİRLEME & 10 GOMİNA
           NavigationRailItem(
             selected = uiState.selectedTabIndex == 1,
             onClick = { viewModel.setTab(1) },
             icon = {
-              Icon(
-                imageVector = if (uiState.selectedTabIndex == 1) Icons.Filled.Anchor else Icons.Outlined.Anchor,
-                contentDescription = "Demirleme"
-              )
+              BadgedBox(
+                badge = {
+                  if (uiState.anchorEvent.isAnchored) {
+                    Badge(
+                      containerColor = DangerRed,
+                      contentColor = Color.White
+                    ) {
+                      Text("10 Gom", fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                    }
+                  }
+                }
+              ) {
+                Icon(
+                  imageVector = if (uiState.selectedTabIndex == 1) Icons.Filled.Anchor else Icons.Outlined.Anchor,
+                  contentDescription = "Demirleme"
+                )
+              }
             },
             label = {
               Text(
@@ -134,15 +201,26 @@ fun MainScreen(
             modifier = Modifier.testTag("rail_tab_anchor")
           )
 
-          // TAB 2: GELGİT
+          // 3. GELGİT HESAPLAMA
           NavigationRailItem(
             selected = uiState.selectedTabIndex == 2,
             onClick = { viewModel.setTab(2) },
             icon = {
-              Icon(
-                imageVector = if (uiState.selectedTabIndex == 2) Icons.Filled.Waves else Icons.Outlined.Waves,
-                contentDescription = "Gelgit"
-              )
+              BadgedBox(
+                badge = {
+                  Badge(
+                    containerColor = if (uiState.analysis.isCurrentlySafe) SeaGreen else DangerRed,
+                    contentColor = Color.White
+                  ) {
+                    Text("UKC", fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                  }
+                }
+              ) {
+                Icon(
+                  imageVector = if (uiState.selectedTabIndex == 2) Icons.Filled.Waves else Icons.Outlined.Waves,
+                  contentDescription = "Gelgit"
+                )
+              }
             },
             label = {
               Text(
@@ -155,49 +233,7 @@ fun MainScreen(
             modifier = Modifier.testTag("rail_tab_tide")
           )
 
-          // TAB 3: DENİZ & HAVA DURUMU
-          NavigationRailItem(
-            selected = uiState.selectedTabIndex == 3,
-            onClick = { viewModel.setTab(3) },
-            icon = {
-              Icon(
-                imageVector = if (uiState.selectedTabIndex == 3) Icons.Filled.WbSunny else Icons.Outlined.WbSunny,
-                contentDescription = "Hava Durumu"
-              )
-            },
-            label = {
-              Text(
-                "Hava",
-                fontSize = 11.sp,
-                fontWeight = if (uiState.selectedTabIndex == 3) FontWeight.ExtraBold else FontWeight.Medium
-              )
-            },
-            colors = railItemColors(),
-            modifier = Modifier.testTag("rail_tab_weather")
-          )
-
-          // TAB 4: CANLI HARİTA (MarineTraffic)
-          NavigationRailItem(
-            selected = uiState.selectedTabIndex == 4,
-            onClick = { viewModel.setTab(4) },
-            icon = {
-              Icon(
-                imageVector = if (uiState.selectedTabIndex == 4) Icons.Filled.Map else Icons.Outlined.Map,
-                contentDescription = "Canlı Harita"
-              )
-            },
-            label = {
-              Text(
-                "Harita",
-                fontSize = 11.sp,
-                fontWeight = if (uiState.selectedTabIndex == 4) FontWeight.ExtraBold else FontWeight.Medium
-              )
-            },
-            colors = railItemColors(),
-            modifier = Modifier.testTag("rail_tab_map")
-          )
-
-          Spacer(modifier = Modifier.weight(1f))
+Spacer(modifier = Modifier.weight(1f))
 
           // Canlı Güvenlik Durumu
           Surface(
@@ -263,6 +299,20 @@ fun MainScreen(
               verticalAlignment = Alignment.CenterVertically,
               horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+              IconButton(
+                onClick = { viewModel.toggleDarkMode() },
+                modifier = Modifier
+                  .size(32.dp)
+                  .background(Color.White.copy(alpha = 0.12f), CircleShape)
+                  .testTag("btn_theme_toggle_landscape")
+              ) {
+                Icon(
+                  imageVector = if (uiState.isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
+                  contentDescription = if (uiState.isDarkMode) "Aydınlık Moda Geç" else "Koyu Moda Geç",
+                  tint = if (uiState.isDarkMode) Color(0xFFFDE047) else Color(0xFF93C5FD),
+                  modifier = Modifier.size(17.dp)
+                )
+              }
               Text(
                 text = "Mevki Suyu: ${uiState.analysis.currentInstantTotalDepthMeters}m (UKC: +${uiState.analysis.currentInstantUkcMeters}m)",
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
@@ -348,43 +398,65 @@ fun MainScreen(
 
               Spacer(modifier = Modifier.width(8.dp))
 
-              // Anlık Durum Rozeti & Derinlik
-              Column(horizontalAlignment = Alignment.End) {
-                Surface(
-                  shape = RoundedCornerShape(16.dp),
-                  color = if (uiState.analysis.isCurrentlySafe) SeaGreen.copy(alpha = 0.25f) else DangerRed.copy(alpha = 0.25f),
-                  border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    if (uiState.analysis.isCurrentlySafe) Color(0xFF34D399) else Color(0xFFF87171)
-                  )
+              // Sağ Taraf: Tema Değiştirme Butonu + Anlık Durum Rozeti & Derinlik
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+              ) {
+                // Aydınlık / Koyu Mod Geçiş Butonu
+                IconButton(
+                  onClick = { viewModel.toggleDarkMode() },
+                  modifier = Modifier
+                    .size(34.dp)
+                    .background(Color.White.copy(alpha = 0.12f), CircleShape)
+                    .testTag("btn_theme_toggle")
                 ) {
-                  Row(
-                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                  ) {
-                    Box(
-                      modifier = Modifier
-                        .size(7.dp)
-                        .background(
-                          if (uiState.analysis.isCurrentlySafe) Color(0xFF34D399) else Color(0xFFF87171),
-                          CircleShape
-                        )
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                      text = if (uiState.analysis.isCurrentlySafe) "GÜVENLİ" else "BEKLEMEDE",
-                      style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold, fontSize = 9.5.sp),
-                      color = if (uiState.analysis.isCurrentlySafe) Color(0xFF6EE7B7) else Color(0xFFFCA5A5)
-                    )
-                  }
+                  Icon(
+                    imageVector = if (uiState.isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
+                    contentDescription = if (uiState.isDarkMode) "Aydınlık Moda Geç" else "Koyu Moda Geç",
+                    tint = if (uiState.isDarkMode) Color(0xFFFDE047) else Color(0xFF93C5FD),
+                    modifier = Modifier.size(18.dp)
+                  )
                 }
 
-                Text(
-                  text = "Su: ${uiState.analysis.currentInstantTotalDepthMeters}m (UKC: +${uiState.analysis.currentInstantUkcMeters}m)",
-                  style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.5.sp),
-                  color = Color.White.copy(alpha = 0.9f),
-                  modifier = Modifier.padding(top = 2.dp)
-                )
+                // Anlık Durum Rozeti & Derinlik
+                Column(horizontalAlignment = Alignment.End) {
+                  Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = if (uiState.analysis.isCurrentlySafe) SeaGreen.copy(alpha = 0.25f) else DangerRed.copy(alpha = 0.25f),
+                    border = androidx.compose.foundation.BorderStroke(
+                      1.dp,
+                      if (uiState.analysis.isCurrentlySafe) Color(0xFF34D399) else Color(0xFFF87171)
+                    )
+                  ) {
+                    Row(
+                      modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                      verticalAlignment = Alignment.CenterVertically
+                    ) {
+                      Box(
+                        modifier = Modifier
+                          .size(7.dp)
+                          .background(
+                            if (uiState.analysis.isCurrentlySafe) Color(0xFF34D399) else Color(0xFFF87171),
+                            CircleShape
+                          )
+                      )
+                      Spacer(modifier = Modifier.width(4.dp))
+                      Text(
+                        text = if (uiState.analysis.isCurrentlySafe) "GÜVENLİ" else "BEKLEMEDE",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold, fontSize = 9.5.sp),
+                        color = if (uiState.analysis.isCurrentlySafe) Color(0xFF6EE7B7) else Color(0xFFFCA5A5)
+                      )
+                    }
+                  }
+
+                  Text(
+                    text = "Su: ${uiState.analysis.currentInstantTotalDepthMeters}m (UKC: +${uiState.analysis.currentInstantUkcMeters}m)",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.5.sp),
+                    color = Color.White.copy(alpha = 0.9f),
+                    modifier = Modifier.padding(top = 2.dp)
+                  )
+                }
               }
             }
 
@@ -442,7 +514,7 @@ fun MainScreen(
                     shape = RoundedCornerShape(6.dp),
                     modifier = Modifier
                       .weight(1f)
-                      .clickable { viewModel.setTab(4) }
+                      .clickable { viewModel.setTab(0) }
                   ) {
                     Row(
                       modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -451,7 +523,7 @@ fun MainScreen(
                       Icon(Icons.Default.Emergency, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
                       Spacer(modifier = Modifier.width(4.dp))
                       Text(
-                        text = "🚨 MOB AKTİF (Haritaya Git)",
+                        text = "🚨 MOB AKTİF",
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 10.sp),
                         color = Color.White
                       )
@@ -474,7 +546,7 @@ fun MainScreen(
                       Icon(Icons.Default.Anchor, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
                       Spacer(modifier = Modifier.width(4.dp))
                       Text(
-                        text = "⚓ DEMİRDE (10 Gomina)",
+                        text = "⚓ DEMİRDE",
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
                         color = Color.White
                       )
@@ -487,20 +559,74 @@ fun MainScreen(
         }
       },
       bottomBar = {
+        val navBg = getMarineCardBg(uiState.isDarkMode)
+        val navBorder = getMarineCardBorder(uiState.isDarkMode)
         Surface(
-          color = CardWhite,
-          border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
+          color = navBg,
+          border = androidx.compose.foundation.BorderStroke(1.dp, navBorder),
           shadowElevation = 10.dp,
           modifier = Modifier.fillMaxWidth()
         ) {
           NavigationBar(
-            containerColor = CardWhite,
+            containerColor = navBg,
             tonalElevation = 0.dp,
             modifier = Modifier
               .testTag("bottom_nav_bar")
               .windowInsetsPadding(WindowInsets.navigationBars)
           ) {
-            // 1. PARAMETRE
+            // 4. WINDY
+          NavigationRailItem(
+            selected = uiState.selectedTabIndex == 3,
+            onClick = { viewModel.setTab(3) },
+            icon = {
+              Icon(
+                imageVector = if (uiState.selectedTabIndex == 3) Icons.Filled.Air else Icons.Outlined.Air,
+                contentDescription = "Windy"
+              )
+            },
+            label = {
+              Text(
+                "Windy",
+                fontSize = 11.sp,
+                fontWeight = if (uiState.selectedTabIndex == 3) FontWeight.ExtraBold else FontWeight.Medium
+              )
+            },
+            colors = railItemColors(),
+            modifier = Modifier.testTag("rail_tab_windy")
+          )
+          // 1. CANLI HARİTA (MarineTraffic AIS)
+            NavigationBarItem(
+              selected = uiState.selectedTabIndex == 4,
+              onClick = { viewModel.setTab(4) },
+              icon = {
+                BadgedBox(
+                  badge = {
+                    Badge(
+                      containerColor = SeaGreen,
+                      contentColor = Color.White
+                    ) {
+                      Text("AIS", fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                    }
+                  }
+                ) {
+                  Icon(
+                    imageVector = if (uiState.selectedTabIndex == 4) Icons.Filled.Map else Icons.Outlined.Map,
+                    contentDescription = "Harita"
+                  )
+                }
+              },
+              label = {
+                Text(
+                  "Harita",
+                  fontSize = 11.sp,
+                  fontWeight = if (uiState.selectedTabIndex == 4) FontWeight.ExtraBold else FontWeight.Medium
+                )
+              },
+              colors = navItemColors(uiState.isDarkMode),
+              modifier = Modifier.testTag("tab_map")
+            )
+
+            // 2. SEYİR PARAMETRELERİ
             NavigationBarItem(
               selected = uiState.selectedTabIndex == 0,
               onClick = { viewModel.setTab(0) },
@@ -517,19 +643,32 @@ fun MainScreen(
                   fontWeight = if (uiState.selectedTabIndex == 0) FontWeight.ExtraBold else FontWeight.Medium
                 )
               },
-              colors = navItemColors(),
+              colors = navItemColors(uiState.isDarkMode),
               modifier = Modifier.testTag("tab_params")
             )
 
-            // 2. DEMİRLEME
+            // 3. DEMİRLEME & 10 GOMİNA
             NavigationBarItem(
               selected = uiState.selectedTabIndex == 1,
               onClick = { viewModel.setTab(1) },
               icon = {
-                Icon(
-                  imageVector = if (uiState.selectedTabIndex == 1) Icons.Filled.Anchor else Icons.Outlined.Anchor,
-                  contentDescription = "Demirleme"
-                )
+                BadgedBox(
+                  badge = {
+                    if (uiState.anchorEvent.isAnchored) {
+                      Badge(
+                        containerColor = DangerRed,
+                        contentColor = Color.White
+                      ) {
+                        Text("10 Gom", fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                      }
+                    }
+                  }
+                ) {
+                  Icon(
+                    imageVector = if (uiState.selectedTabIndex == 1) Icons.Filled.Anchor else Icons.Outlined.Anchor,
+                    contentDescription = "Demirleme"
+                  )
+                }
               },
               label = {
                 Text(
@@ -538,19 +677,30 @@ fun MainScreen(
                   fontWeight = if (uiState.selectedTabIndex == 1) FontWeight.ExtraBold else FontWeight.Medium
                 )
               },
-              colors = navItemColors(),
+              colors = navItemColors(uiState.isDarkMode),
               modifier = Modifier.testTag("tab_anchor")
             )
 
-            // 3. GELGİT
+            // 3. GELGİT HESAPLAMA
             NavigationBarItem(
               selected = uiState.selectedTabIndex == 2,
               onClick = { viewModel.setTab(2) },
               icon = {
-                Icon(
-                  imageVector = if (uiState.selectedTabIndex == 2) Icons.Filled.Waves else Icons.Outlined.Waves,
-                  contentDescription = "Gelgit"
-                )
+                BadgedBox(
+                  badge = {
+                    Badge(
+                      containerColor = if (uiState.analysis.isCurrentlySafe) SeaGreen else DangerRed,
+                      contentColor = Color.White
+                    ) {
+                      Text("UKC", fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                    }
+                  }
+                ) {
+                  Icon(
+                    imageVector = if (uiState.selectedTabIndex == 2) Icons.Filled.Waves else Icons.Outlined.Waves,
+                    contentDescription = "Gelgit"
+                  )
+                }
               },
               label = {
                 Text(
@@ -559,52 +709,11 @@ fun MainScreen(
                   fontWeight = if (uiState.selectedTabIndex == 2) FontWeight.ExtraBold else FontWeight.Medium
                 )
               },
-              colors = navItemColors(),
+              colors = navItemColors(uiState.isDarkMode),
               modifier = Modifier.testTag("tab_tide")
             )
 
-            // 4. DENİZ & HAVA DURUMU
-            NavigationBarItem(
-              selected = uiState.selectedTabIndex == 3,
-              onClick = { viewModel.setTab(3) },
-              icon = {
-                Icon(
-                  imageVector = if (uiState.selectedTabIndex == 3) Icons.Filled.WbSunny else Icons.Outlined.WbSunny,
-                  contentDescription = "Hava Durumu"
-                )
-              },
-              label = {
-                Text(
-                  "Hava",
-                  fontSize = 11.sp,
-                  fontWeight = if (uiState.selectedTabIndex == 3) FontWeight.ExtraBold else FontWeight.Medium
-                )
-              },
-              colors = navItemColors(),
-              modifier = Modifier.testTag("tab_weather")
-            )
-
-            // 5. CANLI HARİTA
-            NavigationBarItem(
-              selected = uiState.selectedTabIndex == 4,
-              onClick = { viewModel.setTab(4) },
-              icon = {
-                Icon(
-                  imageVector = if (uiState.selectedTabIndex == 4) Icons.Filled.Map else Icons.Outlined.Map,
-                  contentDescription = "Harita"
-                )
-              },
-              label = {
-                Text(
-                  "Harita",
-                  fontSize = 11.sp,
-                  fontWeight = if (uiState.selectedTabIndex == 4) FontWeight.ExtraBold else FontWeight.Medium
-                )
-              },
-              colors = navItemColors(),
-              modifier = Modifier.testTag("tab_map")
-            )
-          }
+}
         }
       }
     ) { innerPadding ->
@@ -625,18 +734,11 @@ private fun MainContentArea(
   viewModel: TideNavViewModel,
   modifier: Modifier = Modifier
 ) {
+  val canvasBg = getMarineCanvasBg(uiState.isDarkMode)
   Box(
     modifier = modifier
       .fillMaxSize()
-      .background(
-        Brush.verticalGradient(
-          colors = listOf(
-            BackgroundCanvas,
-            HeaderNavy,
-            Color(0xFF040A14)
-          )
-        )
-      )
+      .background(canvasBg)
   ) {
     when (uiState.selectedTabIndex) {
       0 -> InputParametersView(
@@ -644,24 +746,20 @@ private fun MainContentArea(
         viewModel = viewModel,
         onNavigateToTide = { viewModel.setTab(2) },
         onNavigateToAnchor = { viewModel.setTab(1) },
-        onNavigateToMap = { viewModel.setTab(4) },
-        onNavigateToWeather = { viewModel.setTab(3) }
+        onNavigateToWeather = { viewModel.setTab(3) },
+        onNavigateToMap = { viewModel.setTab(4) }
       )
       1 -> AnchorCalculationView(
         uiState = uiState,
         viewModel = viewModel,
-        onNavigateToMap = { viewModel.setTab(4) },
-        onNavigateToTide = { viewModel.setTab(2) }
+        onNavigateToTide = { viewModel.setTab(2) },
+        onNavigateToMap = { viewModel.setTab(4) }
       )
       2 -> TideWindowsView(
         uiState = uiState,
         viewModel = viewModel
       )
-      3 -> MarineWeatherView(
-        uiState = uiState,
-        viewModel = viewModel
-      )
-      4 -> MarineWeatherMapView(
+      4 -> MarineMapView(
         uiState = uiState,
         viewModel = viewModel
       )
@@ -670,20 +768,20 @@ private fun MainContentArea(
         viewModel = viewModel,
         onNavigateToTide = { viewModel.setTab(2) },
         onNavigateToAnchor = { viewModel.setTab(1) },
-        onNavigateToMap = { viewModel.setTab(4) },
-        onNavigateToWeather = { viewModel.setTab(3) }
+        onNavigateToWeather = { viewModel.setTab(3) },
+        onNavigateToMap = { viewModel.setTab(4) }
       )
     }
   }
 }
 
 @Composable
-private fun navItemColors() = NavigationBarItemDefaults.colors(
+private fun navItemColors(isDarkMode: Boolean) = NavigationBarItemDefaults.colors(
   selectedIconColor = Color.White,
-  selectedTextColor = PrimaryBlueBorder,
-  indicatorColor = PrimaryBlue,
-  unselectedIconColor = TextMuted,
-  unselectedTextColor = TextMuted
+  selectedTextColor = if (isDarkMode) MarineCyan else PrimaryBlue,
+  indicatorColor = if (isDarkMode) PrimaryBlueLight else PrimaryBlue,
+  unselectedIconColor = getMarineTextSecondary(isDarkMode),
+  unselectedTextColor = getMarineTextSecondary(isDarkMode)
 )
 
 @Composable

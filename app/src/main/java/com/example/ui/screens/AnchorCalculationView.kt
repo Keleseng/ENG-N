@@ -26,11 +26,17 @@ import java.util.Locale
 fun AnchorCalculationView(
   uiState: TideUiState,
   viewModel: TideNavViewModel,
-  onNavigateToMap: () -> Unit,
-  onNavigateToTide: () -> Unit,
+  onNavigateToTide: () -> Unit = {},
+  onNavigateToMap: () -> Unit = {},
   modifier: Modifier = Modifier
 ) {
+  val isDark = uiState.isDarkMode
   val result = uiState.anchorCalculationResult
+
+  val cardBg = getMarineCardBg(isDark)
+  val cardBorder = getMarineCardBorder(isDark)
+  val textPrimary = getMarineTextPrimary(isDark)
+  val textMuted = getMarineTextMuted(isDark)
 
   LazyColumn(
     modifier = modifier
@@ -44,8 +50,9 @@ fun AnchorCalculationView(
     item {
       Surface(
         shape = RoundedCornerShape(14.dp),
-        color = HeaderNavy,
-        shadowElevation = 3.dp,
+        color = cardBg,
+        border = androidx.compose.foundation.BorderStroke(1.dp, cardBorder),
+        shadowElevation = 2.dp,
         modifier = Modifier.fillMaxWidth()
       ) {
         Row(
@@ -80,28 +87,28 @@ fun AnchorCalculationView(
               Text(
                 text = if (uiState.anchorEvent.isAnchored) "⚓ DEMİR ATILDI (AKTİF)" else "DEMİRLEME & KALOMA",
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black, fontSize = 14.5.sp),
-                color = Color.White
+                color = textPrimary
               )
               Text(
                 text = "Salma: ${String.format(Locale.US, "%.1f", result.f_secondSwingingCircleMeters)}m (${String.format(Locale.US, "%.2f", result.f_secondSwingingCircleGomina)} Gomina) • Derinlik: ${String.format(Locale.US, "%.1f", result.b_depthMeters)}m",
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                color = Color(0xFFBAE6FD)
+                color = if (isDark) MarineCyan else PrimaryBlue
               )
             }
           }
 
           Surface(
             shape = RoundedCornerShape(20.dp),
-            color = if (result.scopeStatus.isSafe) Color(0xFF059669).copy(alpha = 0.25f) else DangerRed.copy(alpha = 0.25f),
+            color = if (result.scopeStatus.isSafe) (if (isDark) SeaGreenDark else Color(0xFFD1FAE5)) else (if (isDark) DangerRedDark else Color(0xFFFEE2E2)),
             border = androidx.compose.foundation.BorderStroke(
               1.dp,
-              if (result.scopeStatus.isSafe) Color(0xFF34D399) else Color(0xFFF87171)
+              if (result.scopeStatus.isSafe) SeaGreenBorder else DangerRedBorder
             )
           ) {
             Text(
               text = result.scopeStatus.labelTr,
               style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 10.sp),
-              color = if (result.scopeStatus.isSafe) Color(0xFF6EE7B7) else Color(0xFFFCA5A5),
+              color = if (result.scopeStatus.isSafe) (if (isDark) SeaGreen else Color(0xFF059669)) else DangerRed,
               modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
             )
           }
@@ -116,36 +123,6 @@ fun AnchorCalculationView(
         viewModel = viewModel,
         onNavigateToMap = onNavigateToMap
       )
-    }
-
-    // 3. Hızlı Navigasyon Butonları
-    item {
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-      ) {
-        Button(
-          onClick = onNavigateToMap,
-          colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
-          shape = RoundedCornerShape(12.dp),
-          modifier = Modifier.weight(1f).height(48.dp).testTag("btn_anchor_to_map")
-        ) {
-          Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(18.dp))
-          Spacer(modifier = Modifier.width(6.dp))
-          Text("Haritada Gör", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
-        }
-
-        Button(
-          onClick = onNavigateToTide,
-          colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
-          shape = RoundedCornerShape(12.dp),
-          modifier = Modifier.weight(1f).height(48.dp).testTag("btn_anchor_to_tide")
-        ) {
-          Text("Gelgit Analizi", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
-          Spacer(modifier = Modifier.width(6.dp))
-          Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
-        }
-      }
     }
   }
 }

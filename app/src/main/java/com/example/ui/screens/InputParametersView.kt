@@ -39,12 +39,15 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import java.util.Locale
 import com.example.location.GpsLocationProvider
+import com.example.model.LocationPresets
 import com.example.model.VesselPresets
 import com.example.ui.TideNavViewModel
 import com.example.ui.TideUiState
 import com.example.ui.components.AisVesselDetailDialog
 import com.example.ui.components.AnchorCalculationCard
 import com.example.ui.components.SpeedVectorAnalysisCard
+import com.example.ui.components.MarineWeatherCard
+import com.example.ui.components.RealisticMoonPhaseCard
 import com.example.ui.theme.*
 import kotlinx.coroutines.launch
 
@@ -53,19 +56,42 @@ import kotlinx.coroutines.launch
 fun InputParametersView(
   uiState: TideUiState,
   viewModel: TideNavViewModel,
-  onNavigateToTide: () -> Unit,
-  onNavigateToMap: () -> Unit,
+  onNavigateToTide: () -> Unit = {},
   onNavigateToWeather: () -> Unit = {},
   onNavigateToAnchor: () -> Unit = {},
+  onNavigateToMap: () -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   val scrollState = rememberScrollState()
   val context = LocalContext.current
   val coroutineScope = rememberCoroutineScope()
   val gpsProvider = remember { GpsLocationProvider(context) }
+  var showBeaufortGuide by rememberSaveable { mutableStateOf(false) }
   var isVesselParamsExpanded by rememberSaveable { mutableStateOf(false) }
-  var isPortDropdownExpanded by remember { mutableStateOf(false) }
-  var showPortDetails by rememberSaveable { mutableStateOf(false) }
+
+  val isDark = uiState.isDarkMode
+  val cardBg = getMarineCardBg(isDark)
+  val cardBorder = getMarineCardBorder(isDark)
+  val subtleBg = getMarineSubtleBg(isDark)
+  val subtleBorder = getMarineSubtleBorder(isDark)
+  val textPrimary = getMarineTextPrimary(isDark)
+  val textSecondary = getMarineTextSecondary(isDark)
+  val textMuted = getMarineTextMuted(isDark)
+  val inputBg = getMarineInputBg(isDark)
+  val inputBorder = getMarineInputBorder(isDark)
+  val inputLabel = getMarineInputLabel(isDark)
+
+  val inputTextFieldColors = OutlinedTextFieldDefaults.colors(
+    focusedTextColor = if (isDark) MarineYellow else Color(0xFF78350F),
+    unfocusedTextColor = getMarineInputTextColor(isDark),
+    focusedLabelColor = if (isDark) MarineYellowBold else Color(0xFF92400E),
+    unfocusedLabelColor = getMarineInputLabel(isDark),
+    focusedContainerColor = inputBg,
+    unfocusedContainerColor = inputBg,
+    focusedBorderColor = if (isDark) MarineYellow else Color(0xFFD97706),
+    unfocusedBorderColor = inputBorder,
+    cursorColor = if (isDark) MarineYellowBold else Color(0xFFD97706)
+  )
 
   fun fetchGps() {
     viewModel.setGpsLoading(true)
@@ -119,11 +145,674 @@ fun InputParametersView(
     verticalArrangement = Arrangement.spacedBy(14.dp)
   ) {
 
+    
+    Card(
+      shape = RoundedCornerShape(16.dp),
+      colors = CardDefaults.cardColors(containerColor = cardBg),
+      border = androidx.compose.foundation.BorderStroke(1.dp, cardBorder),
+      elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+      modifier = Modifier.fillMaxWidth().testTag("card_gps_section")
+    ) {
+      Column(
+        modifier = Modifier.fillMaxWidth().padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+      ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.LocationOn, contentDescription = null, tint = if (isDark) MarineCyan else PrimaryBlueDark, modifier = Modifier.size(22.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("GPS", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black, fontSize = 15.sp), color = textPrimary)
+        }
+        // GPS CANLI DENİZ TELEMETRİ KARTI - TÜM VERİLER AYRI KUTUCUKLARDA
+        val activeGps = uiState.lastGpsFix
+        if (activeGps != null) {
+          Surface(
+            shape = RoundedCornerShape(10.dp),
+            color = if (isDark) Color(0xFF0F172A) else Color(0xFFE2E8F0),
+            border = androidx.compose.foundation.BorderStroke(1.dp, if (isDark) Color(0xFF1E293B) else Color(0xFFCBD5E1)),
+            modifier = Modifier.fillMaxWidth().testTag("card_gps_marine_telemetry")
+          ) {
+            Column(
+              modifier = Modifier.padding(10.dp),
+              verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+              // Canlı Telemetri Başlığı
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+              ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                  Box(modifier = Modifier.size(8.dp).background(Color(0xFF10B981), CircleShape))
+                  Spacer(modifier = Modifier.width(6.dp))
+                  Text(
+                    text = "GPS",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 11.sp, letterSpacing = 0.5.sp),
+                    color = if (isDark) Color(0xFF38BDF8) else Color(0xFF0369A1)
+                  )
+                }
+
+                Surface(
+                  shape = RoundedCornerShape(4.dp),
+                  color = if (isDark) Color(0xFF1E293B) else Color.White
+                ) {
+                  Text(
+                    text = "Hassasiyet: ±${String.format(Locale.US, "%.1f", activeGps.accuracyMeters)}m",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Bold),
+                    color = if (isDark) Color(0xFF6EE7B7) else Color(0xFF065F46),
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                  )
+                }
+              }
+
+              // 1. Satır Kutucuklar: Enlem & Boylam (Denizci DDM Formatında)
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+              ) {
+                Surface(
+                  shape = RoundedCornerShape(6.dp),
+                  color = if (isDark) Color(0xFF1E293B) else Color.White,
+                  border = androidx.compose.foundation.BorderStroke(0.5.dp, if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1)),
+                  modifier = Modifier.weight(1f)
+                ) {
+                  Column(modifier = Modifier.padding(7.dp)) {
+                    Text("Enlem", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Bold), color = textSecondary)
+                    Text(
+                      text = LocationPresets.formatMarineLatDDM(activeGps.latitude),
+                      style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black, fontSize = 12.5.sp),
+                      color = if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7)
+                    )
+                  }
+                }
+
+                Surface(
+                  shape = RoundedCornerShape(6.dp),
+                  color = if (isDark) Color(0xFF1E293B) else Color.White,
+                  border = androidx.compose.foundation.BorderStroke(0.5.dp, if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1)),
+                  modifier = Modifier.weight(1f)
+                ) {
+                  Column(modifier = Modifier.padding(7.dp)) {
+                    Text("Boylam", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Bold), color = textSecondary)
+                    Text(
+                      text = LocationPresets.formatMarineLonDDM(activeGps.longitude),
+                      style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black, fontSize = 12.5.sp),
+                      color = if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7)
+                    )
+                  }
+                }
+              }
+
+              // 2. Satır Kutucuklar: Rota (COG) & Hız (SOG)
+              val rotDeg = activeGps.bearingDegrees?.toInt() ?: uiState.analysis.vesselHeadingDegrees
+              val sogKnots = activeGps.speedKnots ?: uiState.analysis.vesselSpeedKnots
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+              ) {
+                // ROTA (COG)
+                Surface(
+                  shape = RoundedCornerShape(6.dp),
+                  color = if (isDark) Color(0xFF1E293B) else Color.White,
+                  border = androidx.compose.foundation.BorderStroke(0.5.dp, if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1)),
+                  modifier = Modifier.weight(1f)
+                ) {
+                  Column(modifier = Modifier.padding(7.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                      Icon(
+                        Icons.Default.Navigation,
+                        contentDescription = "Rota",
+                        tint = if (isDark) Color(0xFF38BDF8) else PrimaryBlue,
+                        modifier = Modifier.size(13.dp).rotate(rotDeg.toFloat())
+                      )
+                      Spacer(modifier = Modifier.width(4.dp))
+                      Text(
+                        "ROTA (COG)",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Bold),
+                        color = textSecondary
+                      )
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                      text = "${String.format(Locale.US, "%03d", rotDeg)}°",
+                      style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black, fontSize = 13.5.sp),
+                      color = if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7)
+                    )
+                    Text(
+                      text = uiState.analysis.vesselHeadingCardinal,
+                      style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.5.sp),
+                      color = if (isDark) MarineCyan else PrimaryBlueDark
+                    )
+                  }
+                }
+
+                // HIZ (SOG)
+                Surface(
+                  shape = RoundedCornerShape(6.dp),
+                  color = if (isDark) Color(0xFF1E293B) else Color.White,
+                  border = androidx.compose.foundation.BorderStroke(0.5.dp, if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1)),
+                  modifier = Modifier.weight(1f)
+                ) {
+                  Column(modifier = Modifier.padding(7.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                      Icon(
+                        Icons.Default.Speed,
+                        contentDescription = "Hız",
+                        tint = if (isDark) Color(0xFF38BDF8) else PrimaryBlue,
+                        modifier = Modifier.size(13.dp)
+                      )
+                      Spacer(modifier = Modifier.width(4.dp))
+                      Text(
+                        "HIZ (SOG)",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Bold),
+                        color = textSecondary
+                      )
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                      text = "${String.format(Locale.US, "%.1f", sogKnots)} kn",
+                      style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black, fontSize = 13.5.sp),
+                      color = if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7)
+                    )
+                    Text(
+                      text = "Squat: +${uiState.analysis.calculatedSquatMeters} m",
+                      style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.5.sp),
+                      color = DangerRed
+                    )
+                  }
+                }
+              }
+
+              // 3. Satır Kutucuklar: Akıntı & Rüzgar
+              val curr = uiState.analysis.currentInfo
+              val wind = uiState.analysis.windInfo
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+              ) {
+                // AKINTI
+                Surface(
+                  shape = RoundedCornerShape(6.dp),
+                  color = if (isDark) Color(0xFF1E293B) else Color.White,
+                  border = androidx.compose.foundation.BorderStroke(0.5.dp, if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1)),
+                  modifier = Modifier.weight(1f)
+                ) {
+                  Column(modifier = Modifier.padding(7.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                      Icon(
+                        Icons.Default.Waves,
+                        contentDescription = "Akıntı",
+                        tint = if (isDark) MarineCyan else PrimaryBlue,
+                        modifier = Modifier.size(13.dp).rotate(curr.directionDegrees.toFloat())
+                      )
+                      Spacer(modifier = Modifier.width(4.dp))
+                      Text(
+                        "AKINTI",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Bold),
+                        color = textSecondary
+                      )
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                      text = "${curr.speedKnots} kn • ${String.format(Locale.US, "%03d°", curr.directionDegrees)}",
+                      style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black, fontSize = 12.sp),
+                      color = textPrimary
+                    )
+                    Text(
+                      text = "${curr.phaseName} • ${curr.directionCardinal}",
+                      style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.sp),
+                      color = if (isDark) MarineCyan else PrimaryBlueDark,
+                      maxLines = 1
+                    )
+                  }
+                }
+
+                // RÜZGAR
+                Surface(
+                  shape = RoundedCornerShape(6.dp),
+                  color = if (isDark) Color(0xFF1E293B) else Color.White,
+                  border = androidx.compose.foundation.BorderStroke(0.5.dp, if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1)),
+                  modifier = Modifier.weight(1f)
+                ) {
+                  Column(modifier = Modifier.padding(7.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                      Icon(
+                        Icons.Default.Air,
+                        contentDescription = "Rüzgar",
+                        tint = if (isDark) MarineCyan else PrimaryBlue,
+                        modifier = Modifier.size(13.dp).rotate(wind.directionDegrees.toFloat())
+                      )
+                      Spacer(modifier = Modifier.width(4.dp))
+                      Text(
+                        "RÜZGAR",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Bold),
+                        color = textSecondary
+                      )
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                      text = "${wind.speedKnots} kn • ${String.format(Locale.US, "%03d°", wind.directionDegrees)}",
+                      style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black, fontSize = 12.sp),
+                      color = textPrimary
+                    )
+                    Text(
+                      text = "Bft ${wind.beaufortScale} • ${wind.directionCardinal}",
+                      style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.sp),
+                      color = if (isDark) MarineCyan else PrimaryBlueDark,
+                      maxLines = 1
+                    )
+                  }
+                }
+              }
+
+              // 4. Satır Kutucuklar: İrtifa & Dinamik UKC
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+              ) {
+                Surface(
+                  shape = RoundedCornerShape(6.dp),
+                  color = if (isDark) Color(0xFF1E293B) else Color.White,
+                  border = androidx.compose.foundation.BorderStroke(0.5.dp, if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1)),
+                  modifier = Modifier.weight(1f)
+                ) {
+                  Column(modifier = Modifier.padding(7.dp)) {
+                    Text("Derinlik", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Bold), color = textSecondary)
+                    Text(
+                      text = "${String.format(Locale.US, "%.1f", activeGps.altitudeMeters ?: 0.0)} m",
+                      style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black, fontSize = 13.sp),
+                      color = textPrimary
+                    )
+                  }
+                }
+
+                Surface(
+                  shape = RoundedCornerShape(6.dp),
+                  color = if (isDark) Color(0xFF1E293B) else Color.White,
+                  border = androidx.compose.foundation.BorderStroke(0.5.dp, if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1)),
+                  modifier = Modifier.weight(1f)
+                ) {
+                  Column(modifier = Modifier.padding(7.dp)) {
+                    Text("Dinamik UKC", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Bold), color = textSecondary)
+                    Text(
+                      text = "${String.format(Locale.US, "%.2f", uiState.analysis.currentInstantUkcMeters)} m",
+                      style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black, fontSize = 13.sp),
+                      color = if (uiState.analysis.isCurrentlySafe) Color(0xFF10B981) else Color(0xFFEF4444)
+                    )
+                  }
+                }
+              }
+
+              // 5. Satır Kutucuk: Mevki & En Yakın Liman Bilgisi
+              if (uiState.gpsNearestPortInfo != null) {
+                Surface(
+                  shape = RoundedCornerShape(6.dp),
+                  color = if (isDark) Color(0xFF1E293B) else Color.White,
+                  border = androidx.compose.foundation.BorderStroke(0.5.dp, if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1)),
+                  modifier = Modifier.fillMaxWidth()
+                ) {
+                  Row(
+                    modifier = Modifier.padding(7.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                  ) {
+                    Icon(
+                      imageVector = Icons.Default.Anchor,
+                      contentDescription = null,
+                      tint = if (isDark) MarineCyan else PrimaryBlueDark,
+                      modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                      text = "Mevki: ${uiState.gpsNearestPortInfo}",
+                      style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                      color = textPrimary,
+                      maxLines = 1
+                    )
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        if (uiState.gpsErrorMessage != null) {
+          Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = DangerRedLight,
+            border = androidx.compose.foundation.BorderStroke(1.dp, DangerRedBorder),
+            modifier = Modifier.fillMaxWidth()
+          ) {
+            Row(
+              modifier = Modifier.padding(8.dp),
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              Icon(Icons.Default.Warning, contentDescription = null, tint = DangerRed, modifier = Modifier.size(16.dp))
+              Spacer(modifier = Modifier.width(6.dp))
+              Text(
+                text = uiState.gpsErrorMessage,
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
+                color = if (isDark) Color(0xFFFCA5A5) else DangerRedDark,
+                modifier = Modifier.weight(1f)
+              )
+              IconButton(
+                onClick = { viewModel.dismissGpsMessages() },
+                modifier = Modifier.size(20.dp)
+              ) {
+                Icon(Icons.Default.Close, contentDescription = "Kapat", tint = DangerRed, modifier = Modifier.size(14.dp))
+              }
+            }
+          }
+        }
+        // 5. DENİZ GÖRÜŞÜ & EKSTRA METEOROLOJİ PARAMETRELERİ
+    // ══════════════════════════════════════════════════════════════════════
+    val weather = uiState.marineWeather
+    Card(
+      shape = RoundedCornerShape(14.dp),
+      colors = CardDefaults.cardColors(containerColor = cardBg),
+      border = androidx.compose.foundation.BorderStroke(1.dp, cardBorder),
+      elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+      modifier = Modifier.fillMaxWidth().testTag("card_weather_extra_metrics")
+    ) {
+      Column(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+      ) {
+        Row(
+          verticalAlignment = Alignment.CenterVertically,
+          modifier = Modifier.fillMaxWidth()
+        ) {
+          Icon(
+            imageVector = Icons.Default.Explore,
+            contentDescription = null,
+            tint = if (isDark) MarineCyan else PrimaryBlueDark,
+            modifier = Modifier.size(18.dp)
+          )
+          Spacer(modifier = Modifier.width(6.dp))
+          Text(
+            text = "Meteoroloji",
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
+            color = textPrimary
+          )
+        }
+
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+          // Deniz Görüş Mesafesi
+          Surface(
+            shape = RoundedCornerShape(10.dp),
+            color = subtleBg,
+            border = androidx.compose.foundation.BorderStroke(1.dp, subtleBorder),
+            modifier = Modifier.weight(1f)
+          ) {
+            Column(modifier = Modifier.padding(8.dp)) {
+              Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Visibility, contentDescription = null, tint = MarineCyan, modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Deniz Görüşü", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp), color = textSecondary)
+              }
+              Spacer(modifier = Modifier.height(2.dp))
+              Text(
+                text = "> 10 NM (Açık)",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black, fontSize = 12.5.sp),
+                color = textPrimary
+              )
+              Text("İyi Seyir Görüşü", style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp, color = SeaGreen))
+            }
+          }
+
+          // Deniz Suyu Sıcaklığı
+          Surface(
+            shape = RoundedCornerShape(10.dp),
+            color = subtleBg,
+            border = androidx.compose.foundation.BorderStroke(1.dp, subtleBorder),
+            modifier = Modifier.weight(1f)
+          ) {
+            Column(modifier = Modifier.padding(8.dp)) {
+              Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Thermostat, contentDescription = null, tint = MarineCyan, modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Deniz Suyu Sıcaklığı", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp), color = textSecondary)
+              }
+              Spacer(modifier = Modifier.height(2.dp))
+              val seaTemp = (weather.temperatureC - 1.5).coerceAtLeast(4.0)
+              Text(
+                text = "${String.format(Locale.US, "%.1f", seaTemp)}°C",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black, fontSize = 12.5.sp),
+                color = textPrimary
+              )
+              Text("Yüzey Sıcaklığı", style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp, color = MarineCyan))
+            }
+          }
+        }
+
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+          // Çiy Noktası
+          Surface(
+            shape = RoundedCornerShape(10.dp),
+            color = subtleBg,
+            border = androidx.compose.foundation.BorderStroke(1.dp, subtleBorder),
+            modifier = Modifier.weight(1f)
+          ) {
+            Column(modifier = Modifier.padding(8.dp)) {
+              Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Water, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Çiy Noktası", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp), color = textSecondary)
+              }
+              Spacer(modifier = Modifier.height(2.dp))
+              val dewPoint = weather.temperatureC - ((100 - weather.relativeHumidityPercent) / 5.0)
+              Text(
+                text = "${String.format(Locale.US, "%.1f", dewPoint)}°C",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black, fontSize = 12.5.sp),
+                color = textPrimary
+              )
+              Text("Sis Riski Düşük", style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp, color = textSecondary))
+            }
+          }
+
+          // Hava Basınç Kararlılığı
+          Surface(
+            shape = RoundedCornerShape(10.dp),
+            color = subtleBg,
+            border = androidx.compose.foundation.BorderStroke(1.dp, subtleBorder),
+            modifier = Modifier.weight(1f)
+          ) {
+            Column(modifier = Modifier.padding(8.dp)) {
+              Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Speed, contentDescription = null, tint = Color(0xFFA78BFA), modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Basınç Eğilimi", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp), color = textSecondary)
+              }
+              Spacer(modifier = Modifier.height(2.dp))
+              Text(
+                text = "${weather.surfacePressureHpa} hPa",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black, fontSize = 12.5.sp),
+                color = textPrimary
+              )
+              Text(
+                text = if (weather.surfacePressureHpa >= 1013) "Yüksek (Kararlı)" else "Alçak (Dinamik)",
+                style = MaterialTheme.typography.labelSmall.copy(
+                  fontSize = 8.5.sp,
+                  color = if (weather.surfacePressureHpa >= 1013) SeaGreen else WarningAmber
+                ),
+                maxLines = 1
+              )
+            }
+          }
+        }
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+
+        // 2. ANA DENİZ & HAVA DURUMU KARTI (METRİKLER + GÖKYÜZÜ GÖRSELİ)
+            // ══════════════════════════════════════════════════════════════════════
+            MarineWeatherCard(
+              weather = weather,
+              isGpsActive = uiState.isGpsActive,
+              onRefreshWeather = { viewModel.refreshWeather() },
+              isDarkMode = isDark,
+              modifier = Modifier.fillMaxWidth()
+            )
+        
+            // ══════════════════════════════════════════════════════════════════════
+            // 4. GERÇEKÇİ 3D AY EVRESİ & ASTRONOMİK GELGİT ÇEKİM GÖRSELİ
+            // ══════════════════════════════════════════════════════════════════════
+            RealisticMoonPhaseCard(
+              analysis = uiState.analysis,
+              isDarkMode = isDark,
+              modifier = Modifier.fillMaxWidth()
+            )
+        
+            // ══════════════════════════════════════════════════════════════════════
+            // 5. BEAUFORT RÜZGAR VE DENİZ SKALASI REHBERİ (AÇILIR AKORDEON)
+            // ══════════════════════════════════════════════════════════════════════
+            val chevronRotation by animateFloatAsState(
+              targetValue = if (showBeaufortGuide) 180f else 0f,
+              label = "beaufortRotation"
+            )
+        
+            Card(
+              shape = RoundedCornerShape(14.dp),
+              colors = CardDefaults.cardColors(containerColor = cardBg),
+              border = androidx.compose.foundation.BorderStroke(1.dp, cardBorder),
+              elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+              modifier = Modifier.fillMaxWidth().testTag("card_beaufort_guide")
+            ) {
+              Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                  modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showBeaufortGuide = !showBeaufortGuide }
+                    .padding(12.dp),
+                  horizontalArrangement = Arrangement.SpaceBetween,
+                  verticalAlignment = Alignment.CenterVertically
+                ) {
+                  Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f, fill = false)
+                  ) {
+                    Box(
+                      modifier = Modifier
+                        .size(32.dp)
+                        .background(Color(0xFFFEF3C7), RoundedCornerShape(8.dp)),
+                      contentAlignment = Alignment.Center
+                    ) {
+                      Icon(
+                        imageVector = Icons.Default.Air,
+                        contentDescription = null,
+                        tint = Color(0xFFD97706),
+                        modifier = Modifier.size(18.dp)
+                      )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                      Text(
+                        text = "Beaufort Rüzgar & Deniz Rehberi",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 12.5.sp),
+                        color = textPrimary
+                      )
+                      Text(
+                        text = "Mevcut: ${weather.beaufortDescription}",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.5.sp, color = if (isDark) MarineCyan else PrimaryBlueDark)
+                      )
+                    }
+                  }
+        
+                  Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = if (isDark) MarineCyan else PrimaryBlueDark,
+                    modifier = Modifier
+                      .size(20.dp)
+                      .rotate(chevronRotation)
+                  )
+                }
+        
+                AnimatedVisibility(
+                  visible = showBeaufortGuide,
+                  enter = expandVertically() + fadeIn(),
+                  exit = shrinkVertically() + fadeOut()
+                ) {
+                  Column(
+                    modifier = Modifier
+                      .fillMaxWidth()
+                      .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                  ) {
+                    HorizontalDivider(color = cardBorder.copy(alpha = 0.6f))
+                    Spacer(modifier = Modifier.height(3.dp))
+        
+                    listOf(
+                      Triple("Bft 0 (0-1 kn)", "Sakin (Calm)", "Deniz ayna gibi düzgündür. Dalga 0m."),
+                      Triple("Bft 1-2 (1-6 kn)", "Esinti (Light)", "Küçük dalgacıklar, köpüksüz. Dalga 0.1-0.3m."),
+                      Triple("Bft 3 (7-10 kn)", "Tatlı Rüzgar (Gentle)", "Dalgacıkların tepeleri kırılmaya başlar. Dalga 0.6m."),
+                      Triple("Bft 4 (11-16 kn)", "Mutedil Rüzgar", "Küçük dalgalar uzar, beyaz köpükler. Dalga 1.0m."),
+                      Triple("Bft 5 (17-21 kn)", "Sertçe Rüzgar", "Orta büyüklükte dalgalar, serpinti riski. Dalga 2.0m."),
+                      Triple("Bft 6 (22-27 kn)", "Kuvvetli Rüzgar", "Büyük dalgalar oluşur, köpükler genişler. Dalga 3.0m."),
+                      Triple("Bft 7 (28-33 kn)", "Fırtınamsı Rüzgar", "Deniz kabarır, rüzgar yönünde köpük. Dalga 4.0m."),
+                      Triple("Bft 8 (34-40 kn)", "Fırtına (Gale)", "Yüksek dalgalar, savrulan serpintiler. Dalga 5.5m."),
+                      Triple("Bft 9+ (41+ kn)", "Kuvvetli Fırtına", "Çok yüksek kaba dalgalar, görüş azalır. Dalga 7m+.")
+                    ).forEach { (bft, name, desc) ->
+                      val isCurrent = weather.beaufortDescription.contains(bft.split(" ")[1], ignoreCase = true)
+                      Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isCurrent) (if (isDark) Color(0xFF78350F) else WarningAmberLight) else subtleBg,
+                        border = androidx.compose.foundation.BorderStroke(
+                          1.dp,
+                          if (isCurrent) (if (isDark) Color(0xFFFBBF24) else WarningAmberBorder) else subtleBorder
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                      ) {
+                        Column(modifier = Modifier.padding(7.dp)) {
+                          Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                          ) {
+                            Text(
+                              text = bft,
+                              style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                color = if (isCurrent) (if (isDark) Color(0xFFFBBF24) else WarningAmber) else (if (isDark) MarineCyan else PrimaryBlue)
+                              )
+                            )
+                            Text(
+                              text = name,
+                              style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 10.5.sp,
+                                color = textPrimary
+                              )
+                            )
+                          }
+                          Text(
+                            text = desc,
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, color = textSecondary)
+                          )
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+      }
+    }
+    
+
     // 1. SEYİR MEVKİİ & GPS KOORDİNATLARI
     Card(
       shape = RoundedCornerShape(16.dp),
-      colors = CardDefaults.cardColors(containerColor = CardWhite),
-      border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
+      colors = CardDefaults.cardColors(containerColor = cardBg),
+      border = androidx.compose.foundation.BorderStroke(1.dp, cardBorder),
       elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
       modifier = Modifier.fillMaxWidth().testTag("card_location_inputs")
     ) {
@@ -146,14 +835,14 @@ fun InputParametersView(
             Icon(
               imageVector = Icons.Default.LocationOn,
               contentDescription = null,
-              tint = PrimaryBlueDark,
+              tint = if (isDark) MarineCyan else PrimaryBlueDark,
               modifier = Modifier.size(22.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-              text = "Seyir Koordinatları & Harita Derinliği",
-              style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 14.5.sp),
-              color = TextPrimary,
+              text = "Koordinatlar",
+              style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black, fontSize = 15.sp),
+              color = textPrimary,
               softWrap = true
             )
           }
@@ -183,389 +872,15 @@ fun InputParametersView(
                 strokeWidth = 2.dp
               )
               Spacer(modifier = Modifier.width(4.dp))
-              Text("Aranıyor...", style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp))
+              Text("Aranıyor...", style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, color = Color.White))
             } else if (uiState.isContinuousTrackingActive) {
-              Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(13.dp))
+              Icon(Icons.Default.Sync, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
               Spacer(modifier = Modifier.width(4.dp))
-              Text("Canlı Takip", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp))
+              Text("Canlı Takip", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White))
             } else {
-              Icon(Icons.Default.MyLocation, contentDescription = null, modifier = Modifier.size(13.dp))
+              Icon(Icons.Default.MyLocation, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
               Spacer(modifier = Modifier.width(4.dp))
-              Text("Konum Yenile", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp))
-            }
-          }
-        }
-
-        // GPS Bildirim Mesajları
-        if (uiState.gpsSuccessMessage != null) {
-          Surface(
-            shape = RoundedCornerShape(8.dp),
-            color = SeaGreenLight,
-            border = androidx.compose.foundation.BorderStroke(1.dp, SeaGreenBorder),
-            modifier = Modifier.fillMaxWidth()
-          ) {
-            Row(
-              modifier = Modifier.padding(8.dp),
-              verticalAlignment = Alignment.CenterVertically
-            ) {
-              Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SeaGreenDark, modifier = Modifier.size(16.dp))
-              Spacer(modifier = Modifier.width(6.dp))
-              Text(
-                text = uiState.gpsSuccessMessage,
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                color = SeaGreenDark,
-                modifier = Modifier.weight(1f),
-                softWrap = true
-              )
-              IconButton(
-                onClick = { viewModel.dismissGpsMessages() },
-                modifier = Modifier.size(20.dp)
-              ) {
-                Icon(Icons.Default.Close, contentDescription = "Kapat", tint = SeaGreenDark, modifier = Modifier.size(14.dp))
-              }
-            }
-          }
-        }
-
-        // TÜM GPS BİLGİLERİNİ DENİZ PARAMETRELERİ OLARAK GETİR BUTONU
-        Button(
-          onClick = {
-            if (uiState.lastGpsFix != null) {
-              viewModel.syncAllGpsToMarineParameters()
-            } else {
-              requestLocationAndFetch()
-            }
-          },
-          colors = ButtonDefaults.buttonColors(
-            containerColor = Color(0xFF0284C7),
-            contentColor = Color.White
-          ),
-          shape = RoundedCornerShape(10.dp),
-          contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
-          modifier = Modifier
-            .fillMaxWidth()
-            .testTag("btn_sync_all_gps_marine_parameters")
-        ) {
-          Icon(Icons.Default.GpsFixed, contentDescription = null, modifier = Modifier.size(18.dp))
-          Spacer(modifier = Modifier.width(8.dp))
-          Text(
-            text = "🛰️ Tüm GPS Bilgilerini Deniz Parametreleri Olarak Getir",
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Black, fontSize = 12.sp),
-            softWrap = true,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-          )
-        }
-
-        // GPS CANLI DENİZ TELEMETRİ KARTI (GPS Fix Varsa) - 2x2 Dikey Uyumlu Izgara
-        val activeGps = uiState.lastGpsFix
-        if (activeGps != null) {
-          Surface(
-            shape = RoundedCornerShape(10.dp),
-            color = Color(0xFF0F172A),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B)),
-            modifier = Modifier.fillMaxWidth().testTag("card_gps_marine_telemetry")
-          ) {
-            Column(
-              modifier = Modifier.padding(10.dp),
-              verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-              Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-              ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                  Box(modifier = Modifier.size(7.dp).background(Color(0xFF10B981), CircleShape))
-                  Spacer(modifier = Modifier.width(6.dp))
-                  Text(
-                    text = "CANLI GPS DENİZ TELEMETRİSİ",
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 10.5.sp, letterSpacing = 0.5.sp),
-                    color = Color(0xFF38BDF8)
-                  )
-                }
-
-                Text(
-                  text = "±${String.format(Locale.US, "%.1f", activeGps.accuracyMeters)}m",
-                  style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                  color = Color(0xFF94A3B8)
-                )
-              }
-
-              // 2x2 Izgara Düzeni (Dikey pozisyonda kelimelerin sıkışmasını önler)
-              Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-              ) {
-                Surface(
-                  shape = RoundedCornerShape(6.dp),
-                  color = Color(0xFF1E293B),
-                  modifier = Modifier.weight(1f)
-                ) {
-                  Column(modifier = Modifier.padding(8.dp)) {
-                    Text("SOG (Hız)", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = Color(0xFF94A3B8))
-                    Text("${String.format(Locale.US, "%.1f", activeGps.speedKnots ?: 0.0)} kn", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp), color = Color(0xFF38BDF8))
-                  }
-                }
-
-                Surface(
-                  shape = RoundedCornerShape(6.dp),
-                  color = Color(0xFF1E293B),
-                  modifier = Modifier.weight(1f)
-                ) {
-                  Column(modifier = Modifier.padding(8.dp)) {
-                    Text("COG (Rota)", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = Color(0xFF94A3B8))
-                    Text("${String.format(Locale.US, "%03d", activeGps.bearingDegrees?.toInt() ?: 0)}°", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp), color = Color(0xFF38BDF8))
-                  }
-                }
-              }
-
-              Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-              ) {
-                Surface(
-                  shape = RoundedCornerShape(6.dp),
-                  color = Color(0xFF1E293B),
-                  modifier = Modifier.weight(1f)
-                ) {
-                  Column(modifier = Modifier.padding(8.dp)) {
-                    Text("İrtifa", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = Color(0xFF94A3B8))
-                    Text("${String.format(Locale.US, "%.1f", activeGps.altitudeMeters ?: 0.0)} m", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp), color = Color(0xFFE2E8F0))
-                  }
-                }
-
-                Surface(
-                  shape = RoundedCornerShape(6.dp),
-                  color = Color(0xFF1E293B),
-                  modifier = Modifier.weight(1f)
-                ) {
-                  Column(modifier = Modifier.padding(8.dp)) {
-                    Text("Dinamik UKC", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = Color(0xFF94A3B8))
-                    Text("${String.format(Locale.US, "%.2f", uiState.analysis.currentInstantUkcMeters)} m", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp), color = if (uiState.analysis.isCurrentlySafe) Color(0xFF34D399) else Color(0xFFF87171))
-                  }
-                }
-              }
-
-              if (uiState.gpsNearestPortInfo != null) {
-                Text(
-                  text = "📍 En Yakın Liman/Boğaz: ${uiState.gpsNearestPortInfo}",
-                  style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                  color = Color(0xFFCBD5E1),
-                  softWrap = true
-                )
-              }
-            }
-          }
-        }
-
-        if (uiState.gpsErrorMessage != null) {
-          Surface(
-            shape = RoundedCornerShape(8.dp),
-            color = DangerRedLight,
-            border = androidx.compose.foundation.BorderStroke(1.dp, DangerRedBorder),
-            modifier = Modifier.fillMaxWidth()
-          ) {
-            Row(
-              modifier = Modifier.padding(8.dp),
-              verticalAlignment = Alignment.CenterVertically
-            ) {
-              Icon(Icons.Default.Warning, contentDescription = null, tint = DangerRedDark, modifier = Modifier.size(16.dp))
-              Spacer(modifier = Modifier.width(6.dp))
-              Text(
-                text = uiState.gpsErrorMessage,
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                color = DangerRedDark,
-                modifier = Modifier.weight(1f)
-              )
-              IconButton(
-                onClick = { viewModel.dismissGpsMessages() },
-                modifier = Modifier.size(20.dp)
-              ) {
-                Icon(Icons.Default.Close, contentDescription = "Kapat", tint = DangerRedDark, modifier = Modifier.size(14.dp))
-              }
-            }
-          }
-        }
-
-        // 2. Aşağı Açılır Liman / Boğaz / Seyir Mevkii Seçimi (Dropdown)
-        Column(
-          modifier = Modifier.fillMaxWidth(),
-          verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-          Text(
-            text = "Liman / Boğaz / Seyir Mevkii Seçimi:",
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = TextSecondary)
-          )
-
-          ExposedDropdownMenuBox(
-            expanded = isPortDropdownExpanded,
-            onExpandedChange = { isPortDropdownExpanded = !isPortDropdownExpanded },
-            modifier = Modifier
-              .fillMaxWidth()
-              .testTag("dropdown_box_port_select")
-          ) {
-            OutlinedTextField(
-              value = "${uiState.selectedPort.name} (${uiState.selectedPort.category})",
-              onValueChange = {},
-              readOnly = true,
-              label = { Text("Seçili Askeri Liman") },
-              trailingIcon = {
-                ExposedDropdownMenuDefaults.TrailingIcon(expanded = isPortDropdownExpanded)
-              },
-              leadingIcon = {
-                Icon(
-                  imageVector = Icons.Default.Shield,
-                  contentDescription = null,
-                  tint = PrimaryBlueDark,
-                  modifier = Modifier.size(20.dp)
-                )
-              },
-              colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(
-                focusedContainerColor = CardWhite,
-                unfocusedContainerColor = CardWhite
-              ),
-              shape = RoundedCornerShape(12.dp),
-              modifier = Modifier
-                .menuAnchor()
-                .fillMaxWidth()
-                .testTag("input_port_dropdown_anchor")
-            )
-
-            ExposedDropdownMenu(
-              expanded = isPortDropdownExpanded,
-              onDismissRequest = { isPortDropdownExpanded = false },
-              modifier = Modifier
-                .background(CardWhite)
-                .testTag("dropdown_menu_port_list")
-            ) {
-              com.example.model.LocationPresets.strategicMarineLocations.forEach { port ->
-                val isSelected = uiState.selectedPort.id == port.id
-                DropdownMenuItem(
-                  text = {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                      Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                      ) {
-                        Text(
-                          text = port.name,
-                          style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.SemiBold,
-                            color = if (isSelected) PrimaryBlueDark else TextPrimary
-                          )
-                        )
-                        Surface(
-                          shape = RoundedCornerShape(4.dp),
-                          color = if (isSelected) PrimaryBlueLight else CardSubtle
-                        ) {
-                          Text(
-                            text = port.category,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                              fontSize = 9.sp,
-                              fontWeight = FontWeight.Bold,
-                              color = if (isSelected) PrimaryBlueBorder else TextMuted
-                            ),
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                          )
-                        }
-                      }
-                      Text(
-                        text = "${com.example.model.LocationPresets.formatMarineCoordinates(port.latitude, port.longitude)} • Derinlik: ${port.defaultChartedDepthMeters}m",
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.5.sp, color = TextMuted)
-                      )
-                    }
-                  },
-                  leadingIcon = {
-                    Icon(
-                      imageVector = if (port.category.contains("Boğaz")) Icons.Default.DirectionsBoat else Icons.Default.Anchor,
-                      contentDescription = null,
-                      tint = if (isSelected) PrimaryBlueBorder else TextMuted,
-                      modifier = Modifier.size(18.dp)
-                    )
-                  },
-                  trailingIcon = {
-                    if (isSelected) {
-                      Icon(Icons.Default.Check, contentDescription = "Seçili", tint = PrimaryBlueBorder, modifier = Modifier.size(18.dp))
-                    }
-                  },
-                  onClick = {
-                    viewModel.selectPortPreset(port)
-                    isPortDropdownExpanded = false
-                  },
-                  modifier = Modifier.background(if (isSelected) PrimaryBlue.copy(alpha = 0.15f) else Color.Transparent)
-                )
-              }
-            }
-          }
-
-          // Seçili Liman Bilgi Kartı (Aşağı Açılır / Genişletilebilir)
-          Surface(
-            shape = RoundedCornerShape(10.dp),
-            color = CardSubtle,
-            border = androidx.compose.foundation.BorderStroke(1.dp, CardSubtleBorder),
-            modifier = Modifier
-              .fillMaxWidth()
-              .clickable { showPortDetails = !showPortDetails }
-              .testTag("card_selected_port_details")
-          ) {
-            Column(
-              modifier = Modifier
-                .fillMaxWidth()
-                .padding(10.dp),
-              verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-              Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-              ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                  Icon(Icons.Default.Info, contentDescription = null, tint = PrimaryBlueDark, modifier = Modifier.size(14.dp))
-                  Spacer(modifier = Modifier.width(6.dp))
-                  Text(
-                    text = "Liman & Seyir Detayı: ${uiState.selectedPort.name}",
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
-                    color = PrimaryBlueDark
-                  )
-                }
-                Icon(
-                  imageVector = if (showPortDetails) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                  contentDescription = null,
-                  tint = TextMuted,
-                  modifier = Modifier.size(16.dp)
-                )
-              }
-
-              Text(
-                text = uiState.selectedPort.description,
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, color = TextSecondary)
-              )
-
-              AnimatedVisibility(visible = showPortDetails) {
-                Column(
-                  modifier = Modifier.padding(top = 4.dp),
-                  verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                  HorizontalDivider(color = Color(0xFFCBD5E1))
-                  Text(
-                    text = "• Seyir Koordinatı: ${com.example.model.LocationPresets.formatMarineCoordinates(uiState.selectedPort.latitude, uiState.selectedPort.longitude)}",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, color = TextPrimary)
-                  )
-                  Text(
-                    text = "• Standart Harita Derinliği: ${uiState.selectedPort.defaultChartedDepthMeters} metre",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, color = TextPrimary)
-                  )
-                  Text(
-                    text = "• Ortalama Gelgit Genliği: ±${uiState.selectedPort.typicalTideRangeMeters} metre",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, color = TextPrimary)
-                  )
-                  Text(
-                    text = "• Saat Dilimi: UTC+${uiState.selectedPort.timeZoneOffsetHours.toInt()} (TSİ)",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, color = TextPrimary)
-                  )
-                }
-              }
+              Text("Konum Yenile", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White))
             }
           }
         }
@@ -578,7 +893,9 @@ fun InputParametersView(
           OutlinedTextField(
             value = uiState.latStr,
             onValueChange = { viewModel.updateLat(it) },
-            label = { Text("Enlem (Lat °N)") },
+            label = { Text("Enlem (Lat °N)", fontWeight = FontWeight.Bold) },
+            textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = textPrimary, fontSize = 14.sp),
+            colors = inputTextFieldColors,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             singleLine = true,
             modifier = Modifier.weight(1f).testTag("input_latitude")
@@ -586,7 +903,9 @@ fun InputParametersView(
           OutlinedTextField(
             value = uiState.lonStr,
             onValueChange = { viewModel.updateLon(it) },
-            label = { Text("Boylam (Lon °E)") },
+            label = { Text("Boylam (Lon °E)", fontWeight = FontWeight.Bold) },
+            textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = textPrimary, fontSize = 14.sp),
+            colors = inputTextFieldColors,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             singleLine = true,
             modifier = Modifier.weight(1f).testTag("input_longitude")
@@ -597,7 +916,9 @@ fun InputParametersView(
         OutlinedTextField(
           value = uiState.chartedDepthStr,
           onValueChange = { viewModel.updateChartedDepth(it) },
-          label = { Text("Harita Derinliği (Charted Depth - metre)") },
+          label = { Text("Harita Derinliği (Charted Depth - metre)", fontWeight = FontWeight.Bold) },
+          textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = textPrimary, fontSize = 14.sp),
+          colors = inputTextFieldColors,
           keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
           singleLine = true,
           modifier = Modifier.fillMaxWidth().testTag("input_charted_depth")
@@ -611,8 +932,11 @@ fun InputParametersView(
           // MOB Butonu
           Button(
             onClick = {
-              viewModel.triggerMob()
-              onNavigateToMap()
+              if (uiState.mobEvent.isActive) {
+                viewModel.cancelMob()
+              } else {
+                viewModel.triggerMob()
+              }
             },
             colors = ButtonDefaults.buttonColors(
               containerColor = if (uiState.mobEvent.isActive) Color(0xFF991B1B) else DangerRed,
@@ -622,11 +946,12 @@ fun InputParametersView(
             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
             modifier = Modifier.weight(1f).testTag("btn_quick_mob")
           ) {
-            Icon(Icons.Default.Emergency, contentDescription = null, modifier = Modifier.size(16.dp))
+            Icon(Icons.Default.Emergency, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
             Spacer(modifier = Modifier.width(6.dp))
             Text(
               text = if (uiState.mobEvent.isActive) "MOB AKTİF" else "MOB (Adam Düştü)",
-              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 11.sp)
+              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 11.sp),
+              color = Color.White
             )
           }
 
@@ -637,7 +962,7 @@ fun InputParametersView(
                 viewModel.liftAnchor()
               } else {
                 viewModel.dropAnchor()
-                onNavigateToMap()
+                onNavigateToAnchor()
               }
             },
             colors = ButtonDefaults.buttonColors(
@@ -648,12 +973,209 @@ fun InputParametersView(
             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
             modifier = Modifier.weight(1f).testTag("btn_quick_anchor")
           ) {
-            Icon(Icons.Default.Anchor, contentDescription = null, modifier = Modifier.size(16.dp))
+            Icon(Icons.Default.Anchor, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-              text = if (uiState.anchorEvent.isAnchored) "Demir Al" else "Demir At (10 Gom)",
-              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp)
+              text = if (uiState.anchorEvent.isAnchored) "Demir Al" else "Demir At",
+              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
+              color = Color.White
             )
+          }
+        }
+
+        // MOB Sabit GPS Mevkii Penceresi
+        if (uiState.mobEvent.isActive) {
+          Surface(
+            shape = RoundedCornerShape(10.dp),
+            color = if (isDark) Color(0xFF450A0A) else Color(0xFFFEF2F2),
+            border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFFEF4444)),
+            modifier = Modifier.fillMaxWidth().testTag("card_mob_fixed_position")
+          ) {
+            Column(
+              modifier = Modifier.padding(10.dp),
+              verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+              ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                  Icon(Icons.Default.Emergency, contentDescription = null, tint = Color(0xFFEF4444), modifier = Modifier.size(16.dp))
+                  Spacer(modifier = Modifier.width(6.dp))
+                  Text(
+                    text = "🚨 MOB SABİT MEVKİİ",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 11.5.sp, letterSpacing = 0.5.sp),
+                    color = Color(0xFFEF4444)
+                  )
+                }
+                Surface(
+                  shape = RoundedCornerShape(4.dp),
+                  color = Color(0xFFEF4444).copy(alpha = 0.15f)
+                ) {
+                  Text(
+                    text = "Kayıt: ${uiState.mobEvent.timeFormatted}",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                    color = Color(0xFFEF4444),
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                  )
+                }
+              }
+
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+              ) {
+                Surface(
+                  shape = RoundedCornerShape(6.dp),
+                  color = if (isDark) Color(0xFF1E293B) else Color.White,
+                  border = androidx.compose.foundation.BorderStroke(0.5.dp, Color(0xFFEF4444).copy(alpha = 0.5f)),
+                  modifier = Modifier.weight(1f)
+                ) {
+                  Column(modifier = Modifier.padding(7.dp)) {
+                    Text("Sabit Enlem", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Bold), color = textSecondary)
+                    Text(
+                      text = LocationPresets.formatMarineLatDDM(uiState.mobEvent.latitude),
+                      style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black, fontSize = 12.5.sp),
+                      color = Color(0xFFEF4444)
+                    )
+                  }
+                }
+
+                Surface(
+                  shape = RoundedCornerShape(6.dp),
+                  color = if (isDark) Color(0xFF1E293B) else Color.White,
+                  border = androidx.compose.foundation.BorderStroke(0.5.dp, Color(0xFFEF4444).copy(alpha = 0.5f)),
+                  modifier = Modifier.weight(1f)
+                ) {
+                  Column(modifier = Modifier.padding(7.dp)) {
+                    Text("Sabit Boylam", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Bold), color = textSecondary)
+                    Text(
+                      text = LocationPresets.formatMarineLonDDM(uiState.mobEvent.longitude),
+                      style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black, fontSize = 12.5.sp),
+                      color = Color(0xFFEF4444)
+                    )
+                  }
+                }
+              }
+
+              val currentLat = uiState.latStr.toDoubleOrNull() ?: uiState.selectedPort.latitude
+              val currentLon = uiState.lonStr.toDoubleOrNull() ?: uiState.selectedPort.longitude
+              val distGomina = uiState.mobEvent.calculateDistanceGomina(currentLat, currentLon)
+              val bearingDeg = uiState.mobEvent.calculateBearingDegrees(currentLat, currentLon)
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+              ) {
+                Text(
+                  text = "Mesafe: ${String.format(Locale.US, "%.1f Gomina (%.2f NM)", distGomina, distGomina / 10.0)}",
+                  style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                  color = textPrimary
+                )
+                Text(
+                  text = "Kerteriz: ${String.format(Locale.US, "%03d°", bearingDeg)}",
+                  style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                  color = textPrimary
+                )
+              }
+            }
+          }
+        }
+
+        // Demir Sabit GPS Mevkii Penceresi
+        if (uiState.anchorEvent.isAnchored) {
+          Surface(
+            shape = RoundedCornerShape(10.dp),
+            color = if (isDark) Color(0xFF064E3B).copy(alpha = 0.5f) else Color(0xFFECFDF5),
+            border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF10B981)),
+            modifier = Modifier.fillMaxWidth().testTag("card_anchor_fixed_position")
+          ) {
+            Column(
+              modifier = Modifier.padding(10.dp),
+              verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+              ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                  Icon(Icons.Default.Anchor, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(16.dp))
+                  Spacer(modifier = Modifier.width(6.dp))
+                  Text(
+                    text = "⚓ DEMİRLEME SABİT MEVKİİ",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 11.5.sp, letterSpacing = 0.5.sp),
+                    color = if (isDark) Color(0xFF34D399) else Color(0xFF047857)
+                  )
+                }
+                Surface(
+                  shape = RoundedCornerShape(4.dp),
+                  color = Color(0xFF10B981).copy(alpha = 0.15f)
+                ) {
+                  Text(
+                    text = "Saat: ${uiState.anchorEvent.dropTimeFormatted}",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                    color = if (isDark) Color(0xFF34D399) else Color(0xFF047857),
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                  )
+                }
+              }
+
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+              ) {
+                Surface(
+                  shape = RoundedCornerShape(6.dp),
+                  color = if (isDark) Color(0xFF1E293B) else Color.White,
+                  border = androidx.compose.foundation.BorderStroke(0.5.dp, Color(0xFF10B981).copy(alpha = 0.5f)),
+                  modifier = Modifier.weight(1f)
+                ) {
+                  Column(modifier = Modifier.padding(7.dp)) {
+                    Text("Sabit Enlem", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Bold), color = textSecondary)
+                    Text(
+                      text = LocationPresets.formatMarineLatDDM(uiState.anchorEvent.latitude),
+                      style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black, fontSize = 12.5.sp),
+                      color = if (isDark) Color(0xFF34D399) else Color(0xFF047857)
+                    )
+                  }
+                }
+
+                Surface(
+                  shape = RoundedCornerShape(6.dp),
+                  color = if (isDark) Color(0xFF1E293B) else Color.White,
+                  border = androidx.compose.foundation.BorderStroke(0.5.dp, Color(0xFF10B981).copy(alpha = 0.5f)),
+                  modifier = Modifier.weight(1f)
+                ) {
+                  Column(modifier = Modifier.padding(7.dp)) {
+                    Text("Sabit Boylam", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Bold), color = textSecondary)
+                    Text(
+                      text = LocationPresets.formatMarineLonDDM(uiState.anchorEvent.longitude),
+                      style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black, fontSize = 12.5.sp),
+                      color = if (isDark) Color(0xFF34D399) else Color(0xFF047857)
+                    )
+                  }
+                }
+              }
+
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+              ) {
+                Text(
+                  text = "Derinlik: ${String.format(Locale.US, "%.1f", uiState.anchorEvent.chartedDepthAtDropMeters)} m",
+                  style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                  color = textPrimary
+                )
+                Text(
+                  text = "Emniyet: ${String.format(Locale.US, "%.1f Gomina", uiState.anchorEvent.safeSwingingRadiusGomina)}",
+                  style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                  color = textPrimary
+                )
+              }
+            }
           }
         }
       }
@@ -720,8 +1242,8 @@ fun InputParametersView(
 
     Card(
       shape = RoundedCornerShape(16.dp),
-      colors = CardDefaults.cardColors(containerColor = CardWhite),
-      border = androidx.compose.foundation.BorderStroke(1.dp, if (isVesselParamsExpanded) PrimaryBlue.copy(alpha = 0.5f) else CardBorder),
+      colors = CardDefaults.cardColors(containerColor = cardBg),
+      border = androidx.compose.foundation.BorderStroke(1.dp, if (isVesselParamsExpanded) (if (isDark) MarineCyan else PrimaryBlue) else cardBorder),
       elevation = CardDefaults.cardElevation(defaultElevation = if (isVesselParamsExpanded) 3.dp else 1.5.dp),
       modifier = Modifier
         .fillMaxWidth()
@@ -747,7 +1269,7 @@ fun InputParametersView(
               modifier = Modifier
                 .size(38.dp)
                 .background(
-                  if (isVesselParamsExpanded) PrimaryBlue else PrimaryBlue.copy(alpha = 0.12f),
+                  if (isVesselParamsExpanded) (if (isDark) PrimaryBlue else PrimaryBlueDark) else (if (isDark) PrimaryBlueLight else Color(0xFFDBEAFE)),
                   RoundedCornerShape(10.dp)
                 ),
               contentAlignment = Alignment.Center
@@ -755,7 +1277,7 @@ fun InputParametersView(
               Icon(
                 imageVector = Icons.Default.DirectionsBoat,
                 contentDescription = null,
-                tint = if (isVesselParamsExpanded) Color.White else PrimaryBlueDark,
+                tint = if (isVesselParamsExpanded) Color.White else (if (isDark) MarineCyan else PrimaryBlueDark),
                 modifier = Modifier.size(22.dp)
               )
             }
@@ -764,10 +1286,10 @@ fun InputParametersView(
               Text(
                 text = "Gemi Özellikleri & Seyir Değerleri",
                 style = MaterialTheme.typography.titleMedium.copy(
-                  fontWeight = FontWeight.Bold,
-                  fontSize = 14.sp
+                  fontWeight = FontWeight.Black,
+                  fontSize = 14.5.sp
                 ),
-                color = TextPrimary,
+                color = textPrimary,
                 softWrap = true
               )
               // Özet Gemi Değerleri Satırı
@@ -775,7 +1297,8 @@ fun InputParametersView(
                 text = "${if (uiState.vesselName.isNotBlank()) "${uiState.vesselName} • " else ""}Draft: ${uiState.draftStr}m • Hız: ${uiState.speedStr}kn • Boy: ${uiState.loaStr}m",
                 style = MaterialTheme.typography.bodySmall.copy(
                   fontSize = 11.sp,
-                  color = if (isVesselParamsExpanded) PrimaryBlueDark else TextMuted
+                  fontWeight = FontWeight.Medium,
+                  color = if (isVesselParamsExpanded) (if (isDark) MarineCyan else PrimaryBlueDark) else textSecondary
                 ),
                 maxLines = 1
               )
@@ -813,7 +1336,7 @@ fun InputParametersView(
 
             Surface(
               shape = RoundedCornerShape(8.dp),
-              color = if (isVesselParamsExpanded) PrimaryBlue.copy(alpha = 0.12f) else CardSubtle,
+              color = if (isVesselParamsExpanded) (if (isDark) PrimaryBlueLight else Color(0xFFDBEAFE)) else subtleBg,
               modifier = Modifier.size(32.dp)
             ) {
               Box(
@@ -823,7 +1346,7 @@ fun InputParametersView(
                 Icon(
                   imageVector = Icons.Default.KeyboardArrowDown,
                   contentDescription = if (isVesselParamsExpanded) "Menüyü Kapat" else "Menüyü Aç",
-                  tint = if (isVesselParamsExpanded) PrimaryBlueDark else TextMuted,
+                  tint = if (isVesselParamsExpanded) (if (isDark) MarineCyan else PrimaryBlueDark) else textSecondary,
                   modifier = Modifier
                     .size(20.dp)
                     .rotate(chevronRotation)
@@ -846,14 +1369,14 @@ fun InputParametersView(
             verticalArrangement = Arrangement.spacedBy(10.dp)
           ) {
             HorizontalDivider(
-              color = CardBorder.copy(alpha = 0.6f),
+              color = subtleBorder,
               thickness = 1.dp,
               modifier = Modifier.padding(bottom = 2.dp)
             )
 
             Text(
               text = "Gemi tipini, boyutlarını, MMSI numarasını ve anlık seyir değerlerini manuel olarak güncelleyebilir veya AIS üzerinden takip başlatabilirsiniz.",
-              style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp, color = TextMuted)
+              style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp, fontWeight = FontWeight.Normal, color = textSecondary)
             )
 
             // Gemi Adı ve Gemi Tipi
@@ -864,16 +1387,20 @@ fun InputParametersView(
               OutlinedTextField(
                 value = uiState.vesselName,
                 onValueChange = { viewModel.updateVesselName(it) },
-                label = { Text("Gemi Adı") },
+                label = { Text("Gemi Adı", fontWeight = FontWeight.Bold) },
                 placeholder = { Text("Gemi adı...") },
+                textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = textPrimary, fontSize = 14.sp),
+                colors = inputTextFieldColors,
                 singleLine = true,
                 modifier = Modifier.weight(1.2f).testTag("input_vessel_name")
               )
               OutlinedTextField(
                 value = uiState.vesselTypeStr,
                 onValueChange = { viewModel.updateVesselType(it) },
-                label = { Text("Gemi Tipi") },
+                label = { Text("Gemi Tipi", fontWeight = FontWeight.Bold) },
                 placeholder = { Text("Örn: Askeri / Kargo") },
+                textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = textPrimary, fontSize = 14.sp),
+                colors = inputTextFieldColors,
                 singleLine = true,
                 modifier = Modifier.weight(1f).testTag("input_vessel_type")
               )
@@ -888,8 +1415,10 @@ fun InputParametersView(
               OutlinedTextField(
                 value = uiState.mmsiStr,
                 onValueChange = { viewModel.updateMmsi(it) },
-                label = { Text("MMSI No (9 Hane)") },
+                label = { Text("MMSI No (9 Hane)", fontWeight = FontWeight.Bold) },
                 placeholder = { Text("271048179") },
+                textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = textPrimary, fontSize = 14.sp),
+                colors = inputTextFieldColors,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
                 modifier = Modifier.weight(1.1f).testTag("input_vessel_mmsi")
@@ -904,7 +1433,8 @@ fun InputParametersView(
                   }
                 },
                 colors = ButtonDefaults.buttonColors(
-                  containerColor = if (uiState.isMmsiTrackingActive) DangerRed else PrimaryBlue
+                  containerColor = if (uiState.isMmsiTrackingActive) DangerRed else PrimaryBlue,
+                  contentColor = Color.White
                 ),
                 shape = RoundedCornerShape(10.dp),
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 12.dp),
@@ -913,15 +1443,15 @@ fun InputParametersView(
                 if (uiState.isAisLoading) {
                   CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                   Spacer(modifier = Modifier.width(4.dp))
-                  Text("Aranıyor...", style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp))
+                  Text("Aranıyor...", style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, color = Color.White))
                 } else if (uiState.isMmsiTrackingActive) {
-                  Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(16.dp))
+                  Icon(Icons.Default.Stop, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                   Spacer(modifier = Modifier.width(4.dp))
-                  Text("Takibi Durdur", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp))
+                  Text("Takibi Durdur", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White))
                 } else {
-                  Icon(Icons.Default.TrackChanges, contentDescription = null, modifier = Modifier.size(16.dp))
+                  Icon(Icons.Default.TrackChanges, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                   Spacer(modifier = Modifier.width(4.dp))
-                  Text("MMSI Takip Başlat", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp))
+                  Text("MMSI Takip Başlat", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White))
                 }
               }
             }
@@ -934,7 +1464,9 @@ fun InputParametersView(
               OutlinedTextField(
                 value = uiState.imoStr,
                 onValueChange = { viewModel.updateImo(it) },
-                label = { Text("IMO No (7 Hane)") },
+                label = { Text("IMO No (7 Hane)", fontWeight = FontWeight.Bold) },
+                textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = textPrimary, fontSize = 14.sp),
+                colors = inputTextFieldColors,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
                 modifier = Modifier.weight(1f).testTag("input_vessel_imo")
@@ -942,7 +1474,9 @@ fun InputParametersView(
               OutlinedTextField(
                 value = uiState.callSignStr,
                 onValueChange = { viewModel.updateCallSign(it) },
-                label = { Text("Çağrı İşareti (Call Sign)") },
+                label = { Text("Çağrı İşareti (Call Sign)", fontWeight = FontWeight.Bold) },
+                textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = textPrimary, fontSize = 14.sp),
+                colors = inputTextFieldColors,
                 singleLine = true,
                 modifier = Modifier.weight(1f).testTag("input_vessel_callsign")
               )
@@ -956,7 +1490,9 @@ fun InputParametersView(
               OutlinedTextField(
                 value = uiState.loaStr,
                 onValueChange = { viewModel.updateLoa(it) },
-                label = { Text("Boy (LOA - m)") },
+                label = { Text("Boy (LOA - m)", fontWeight = FontWeight.Bold) },
+                textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = textPrimary, fontSize = 14.sp),
+                colors = inputTextFieldColors,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 singleLine = true,
                 modifier = Modifier.weight(1f).testTag("input_vessel_loa")
@@ -964,7 +1500,9 @@ fun InputParametersView(
               OutlinedTextField(
                 value = uiState.beamStr,
                 onValueChange = { viewModel.updateBeam(it) },
-                label = { Text("En (Beam - m)") },
+                label = { Text("En (Beam - m)", fontWeight = FontWeight.Bold) },
+                textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = textPrimary, fontSize = 14.sp),
+                colors = inputTextFieldColors,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 singleLine = true,
                 modifier = Modifier.weight(1f).testTag("input_vessel_beam")
@@ -979,7 +1517,9 @@ fun InputParametersView(
               OutlinedTextField(
                 value = uiState.draftStr,
                 onValueChange = { viewModel.updateDraft(it) },
-                label = { Text("Draft (m)") },
+                label = { Text("Draft (m)", fontWeight = FontWeight.Bold) },
+                textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = textPrimary, fontSize = 14.sp),
+                colors = inputTextFieldColors,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 singleLine = true,
                 modifier = Modifier.weight(1f).testTag("input_vessel_draft")
@@ -987,7 +1527,9 @@ fun InputParametersView(
               OutlinedTextField(
                 value = uiState.blockCoefficientStr,
                 onValueChange = { viewModel.updateBlockCoefficient(it) },
-                label = { Text("Blok Kats. (Cb)") },
+                label = { Text("Blok Kats. (Cb)", fontWeight = FontWeight.Bold) },
+                textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = textPrimary, fontSize = 14.sp),
+                colors = inputTextFieldColors,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 singleLine = true,
                 modifier = Modifier.weight(1f).testTag("input_vessel_cb")
@@ -995,7 +1537,9 @@ fun InputParametersView(
               OutlinedTextField(
                 value = uiState.ukcStr,
                 onValueChange = { viewModel.updateUkc(it) },
-                label = { Text("Min UKC (m)") },
+                label = { Text("Min UKC (m)", fontWeight = FontWeight.Bold) },
+                textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = textPrimary, fontSize = 14.sp),
+                colors = inputTextFieldColors,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 singleLine = true,
                 modifier = Modifier.weight(1f).testTag("input_vessel_ukc")
@@ -1010,7 +1554,9 @@ fun InputParametersView(
               OutlinedTextField(
                 value = uiState.speedStr,
                 onValueChange = { viewModel.updateSpeed(it) },
-                label = { Text("Su Sürati (STW - kn)") },
+                label = { Text("Su Sürati (STW - kn)", fontWeight = FontWeight.Bold) },
+                textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = textPrimary, fontSize = 14.sp),
+                colors = inputTextFieldColors,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 singleLine = true,
                 modifier = Modifier.weight(1f).testTag("input_vessel_speed")
@@ -1018,7 +1564,9 @@ fun InputParametersView(
               OutlinedTextField(
                 value = uiState.headingDegreesStr,
                 onValueChange = { viewModel.updateHeading(it) },
-                label = { Text("Pruva Açısı (°)") },
+                label = { Text("Pruva Açısı (°)", fontWeight = FontWeight.Bold) },
+                textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = textPrimary, fontSize = 14.sp),
+                colors = inputTextFieldColors,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
                 modifier = Modifier.weight(1f).testTag("input_vessel_heading")
@@ -1030,7 +1578,7 @@ fun InputParametersView(
               onClick = { isVesselParamsExpanded = false },
               shape = RoundedCornerShape(8.dp),
               modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-              colors = ButtonDefaults.outlinedButtonColors(contentColor = PrimaryBlueDark)
+              colors = ButtonDefaults.outlinedButtonColors(contentColor = if (isDark) MarineCyan else PrimaryBlueDark)
             ) {
               Icon(Icons.Default.KeyboardArrowUp, contentDescription = null, modifier = Modifier.size(16.dp))
               Spacer(modifier = Modifier.width(6.dp))
@@ -1041,236 +1589,13 @@ fun InputParametersView(
       }
     }
 
-    // 3. MARINETRAFFIC AIS ENTEGRASYONU (NB252 / MMSI: 222111447) KARTI
-    Card(
-      shape = RoundedCornerShape(16.dp),
-      colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
-      border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF334155)),
-      elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
-      modifier = Modifier.fillMaxWidth().testTag("card_marinetraffic_ais")
-    ) {
-      Column(
-        modifier = Modifier
-          .fillMaxWidth()
-          .padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-      ) {
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.SpaceBetween,
-          verticalAlignment = Alignment.CenterVertically
-        ) {
-          Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-              modifier = Modifier
-                .size(28.dp)
-                .background(Color(0xFF0284C7), CircleShape),
-              contentAlignment = Alignment.Center
-            ) {
-              Icon(Icons.Default.Language, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            Column {
-              Text(
-                text = "MarineTraffic AIS Bilgileri",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black, color = Color.White, fontSize = 15.sp)
-              )
-              Text(
-                text = "MMSI: 222111447 Entegrasyonu",
-                style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF38BDF8), fontSize = 11.sp)
-              )
-            }
-          }
-
-          Surface(
-            shape = RoundedCornerShape(6.dp),
-            color = Color(0xFF1E293B)
-          ) {
-            Text(
-              text = "MARINETRAFFIC",
-              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 9.sp, color = Color(0xFF94A3B8)),
-              modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-            )
-          }
-        }
-
-        Text(
-          text = "MarineTraffic üzerindeki (MMSI: 222111447, IMO: 7654320, Call Sign: TST7) gemisinin gerçek zamanlı AIS telemetrisini, hızını, rotasını ve teknik özelliklerini doğrudan içe aktarın.",
-          style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp, color = Color(0xFFCBD5E1))
-        )
-
-        // Hızlı AIS Bilgi Önizlemesi (Yüklüyse veya Hazırsa)
-        Surface(
-          shape = RoundedCornerShape(10.dp),
-          color = Color(0xFF1E293B),
-          modifier = Modifier.fillMaxWidth()
-        ) {
-          Row(
-            modifier = Modifier
-              .fillMaxWidth()
-              .padding(10.dp),
-            horizontalArrangement = Arrangement.SpaceAround
-          ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-              Text("Gemi", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, color = Color(0xFF94A3B8)))
-              Text(uiState.vesselName.ifEmpty { "-" }, style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = Color.White))
-            }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-              Text("MMSI / IMO", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, color = Color(0xFF94A3B8)))
-              Text("222111447 / 7654320", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = Color(0xFF38BDF8)))
-            }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-              Text("Boy / Draft", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, color = Color(0xFF94A3B8)))
-              Text("98m / 3.8m", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = Color(0xFF34D399)))
-            }
-          }
-        }
-
-        // MarineTraffic AIS Butonları
-        Column(
-          modifier = Modifier.fillMaxWidth(),
-          verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-          ) {
-            Button(
-              onClick = {
-                viewModel.loadAtlanticMarineTrafficZone()
-              },
-              colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
-              shape = RoundedCornerShape(10.dp),
-              contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
-              modifier = Modifier.weight(1f).testTag("btn_load_marinetraffic_atlantic_zone")
-            ) {
-              Icon(Icons.Default.Place, contentDescription = null, modifier = Modifier.size(15.dp))
-              Spacer(modifier = Modifier.width(4.dp))
-              Text(
-                text = "MarineTraffic (-12/25 Z:4)",
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.5.sp, lineHeight = 13.sp),
-                softWrap = true,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-              )
-            }
-
-            Button(
-              onClick = {
-                viewModel.loadMarineTrafficShip10481795()
-              },
-              colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
-              shape = RoundedCornerShape(10.dp),
-              contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
-              modifier = Modifier.weight(1f).testTag("btn_load_vesselfinder_ship")
-            ) {
-              Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(15.dp))
-              Spacer(modifier = Modifier.width(4.dp))
-              Text(
-                text = "Harita / AIS Getir",
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
-                softWrap = true,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-              )
-            }
-          }
-
-          OutlinedButton(
-            onClick = {
-              viewModel.setShowAisDetailDialog(true)
-            },
-            shape = RoundedCornerShape(10.dp),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8)),
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
-            modifier = Modifier.fillMaxWidth().testTag("btn_open_ais_sheet")
-          ) {
-            Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(16.dp))
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-              text = "AIS Canlı Detay & Gemi Haritası (VesselFinder)",
-              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
-              softWrap = true,
-              textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-          }
-        }
-      }
-    }
-
-    // 3. DEMİRLEME KISMINA GEÇİŞ HIZLI KARTI
-    Surface(
-      shape = RoundedCornerShape(14.dp),
-      color = CardSubtle,
-      border = androidx.compose.foundation.BorderStroke(1.dp, SeaGreenBorder),
-      modifier = Modifier
-        .fillMaxWidth()
-        .clickable { onNavigateToAnchor() }
-        .testTag("banner_go_to_anchor")
-    ) {
-      Row(
-        modifier = Modifier
-          .fillMaxWidth()
-          .padding(14.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-      ) {
-        Row(
-          verticalAlignment = Alignment.CenterVertically,
-          modifier = Modifier.weight(1f)
-        ) {
-          Surface(
-            shape = RoundedCornerShape(10.dp),
-            color = SeaGreenDark,
-            modifier = Modifier.size(40.dp)
-          ) {
-            Box(contentAlignment = Alignment.Center) {
-              Icon(Icons.Default.Anchor, contentDescription = null, tint = SeaGreen, modifier = Modifier.size(22.dp))
-            }
-          }
-          Spacer(modifier = Modifier.width(12.dp))
-          Column {
-            Text(
-              text = "Demirleme & Kaloma",
-              style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-              color = TextPrimary
-            )
-            Text(
-              text = "Salma Dairesi: ${String.format(java.util.Locale.US, "%.1f", uiState.anchorCalculationResult.f_secondSwingingCircleMeters)}m • Alt Menüden Aç",
-              style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-              color = SeaGreen
-            )
-          }
-        }
-        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = SeaGreen)
-      }
-    }
-
-    // 4. GPS SÜRATİ & YERE GÖRE SÜRAT ANALİZ KARTI
+    // 3. GPS SÜRATİ & YERE GÖRE SÜRAT ANALİZ KARTI
     SpeedVectorAnalysisCard(
       speedAnalysis = uiState.speedCalculationResult,
       onSyncGpsSpeed = { viewModel.syncGpsTelemetryToInputs() },
-      onRequestGps = { requestLocationAndFetch() }
+      onRequestGps = { requestLocationAndFetch() },
+      isDarkMode = isDark
     )
-
-    // 5. GELGİT HESAPLAMA VE GRAFİĞE GEÇİŞ BUTONU
-    Button(
-      onClick = onNavigateToTide,
-      colors = ButtonDefaults.buttonColors(
-        containerColor = PrimaryBlue,
-        contentColor = Color.White
-      ),
-      shape = RoundedCornerShape(12.dp),
-      modifier = Modifier
-        .fillMaxWidth()
-        .height(52.dp)
-        .testTag("btn_proceed_to_tide_chart")
-    ) {
-      Text(
-        text = "Gelgit Analizine Git",
-        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
-      )
-      Spacer(modifier = Modifier.width(8.dp))
-      Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
-    }
 
     Spacer(modifier = Modifier.height(16.dp))
   }
@@ -1283,7 +1608,8 @@ fun InputParametersView(
       onDismiss = { viewModel.setShowAisDetailDialog(false) },
       onApplyToApp = { selectedShip ->
         viewModel.applyAisVesselData(selectedShip)
-      }
+      },
+      isDarkMode = isDark
     )
   }
 }

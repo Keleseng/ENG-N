@@ -202,6 +202,26 @@ object LocationPresets {
 
   val defaultPorts = strategicMarineLocations
 
+  fun formatMarineLatDDM(lat: Double): String {
+    val absLat = abs(lat)
+    val deg = absLat.toInt()
+    val min = (absLat - deg) * 60.0
+    val dir = if (lat >= 0) "K" else "G"
+    return String.format(Locale.US, "%s %02d° %06.3f'", dir, deg, min)
+  }
+
+  fun formatMarineLonDDM(lon: Double): String {
+    val absLon = abs(lon)
+    val deg = absLon.toInt()
+    val min = (absLon - deg) * 60.0
+    val dir = if (lon >= 0) "D" else "B"
+    return String.format(Locale.US, "%s %03d° %06.3f'", dir, deg, min)
+  }
+
+  fun formatMarineDdmCoordinates(lat: Double, lon: Double): String {
+    return "${formatMarineLatDDM(lat)} ${formatMarineLonDDM(lon)}"
+  }
+
   fun formatMarineLatitude(lat: Double): String {
     val absLat = abs(lat)
     val deg = absLat.toInt()

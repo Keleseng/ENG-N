@@ -15,17 +15,6 @@ data class VesselProfile(
 object VesselPresets {
   val defaultVessels = listOf(
     VesselProfile(
-      id = "tcg_izmir_military",
-      name = "",
-      typeName = "Military Ops",
-      loaMeters = 98.0,
-      beamMeters = 13.5,
-      draftMeters = 3.8,
-      blockCoefficient = 0.55,
-      defaultSpeedKnots = 0.0,
-      minUkcMeters = 1.0
-    ),
-    VesselProfile(
       id = "tcg_izmir",
       name = "TCG İZMİR",
       typeName = "MİLGEM İstif Sınıfı Fırkateyn",

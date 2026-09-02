@@ -27,13 +27,40 @@ import com.example.ui.theme.*
 fun SafeWindowCard(
   window: SafeNavigationWindow,
   isRecommendedBest: Boolean,
+  isDarkMode: Boolean = false,
   modifier: Modifier = Modifier
 ) {
+  val cardBg = getMarineCardBg(isDarkMode)
+  val cardBorder = getMarineCardBorder(isDarkMode)
+  val subtleBg = getMarineSubtleBg(isDarkMode)
+  val textPrimary = getMarineTextPrimary(isDarkMode)
+  val textMuted = getMarineTextMuted(isDarkMode)
+
   val (ratingColor, ratingBg, ratingBorder, ratingText) = when (window.rating) {
-    WindowSafetyRating.OPTIMAL -> Tuple4(SeaGreen, SeaGreenLight, SeaGreenBorder, "OPTİMAL GEÇİŞ")
-    WindowSafetyRating.SUFFICIENT -> Tuple4(PrimaryBlue, PrimaryBlueLight, PrimaryBlueBorder, "GÜVENLİ")
-    WindowSafetyRating.MARGINAL -> Tuple4(WarningAmber, WarningAmberLight, WarningAmberBorder, "KRİTİK SINIR")
-    WindowSafetyRating.UNSAFE -> Tuple4(DangerRed, DangerRedLight, DangerRedBorder, "RİSKLİ")
+    WindowSafetyRating.OPTIMAL -> Tuple4(
+      if (isDarkMode) SeaGreen else Color(0xFF059669),
+      if (isDarkMode) SeaGreenLight else Color(0xFFD1FAE5),
+      SeaGreenBorder,
+      "OPTİMAL GEÇİŞ"
+    )
+    WindowSafetyRating.SUFFICIENT -> Tuple4(
+      if (isDarkMode) MarineCyan else PrimaryBlue,
+      if (isDarkMode) PrimaryBlueLight else Color(0xFFDBEAFE),
+      PrimaryBlueBorder,
+      "GÜVENLİ"
+    )
+    WindowSafetyRating.MARGINAL -> Tuple4(
+      if (isDarkMode) WarningAmber else Color(0xFFD97706),
+      if (isDarkMode) WarningAmberLight else Color(0xFFFEF3C7),
+      WarningAmberBorder,
+      "KRİTİK SINIR"
+    )
+    WindowSafetyRating.UNSAFE -> Tuple4(
+      DangerRed,
+      if (isDarkMode) DangerRedLight else Color(0xFFFEE2E2),
+      DangerRedBorder,
+      "RİSKLİ"
+    )
   }
 
   Card(
@@ -41,11 +68,11 @@ fun SafeWindowCard(
       .fillMaxWidth()
       .testTag("safe_window_card_${window.id}"),
     shape = RoundedCornerShape(16.dp),
-    colors = CardDefaults.cardColors(containerColor = CardWhite),
+    colors = CardDefaults.cardColors(containerColor = cardBg),
     border = if (isRecommendedBest) {
       androidx.compose.foundation.BorderStroke(2.dp, PrimaryBlue)
     } else {
-      androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
+      androidx.compose.foundation.BorderStroke(1.dp, cardBorder)
     },
     elevation = CardDefaults.cardElevation(defaultElevation = if (isRecommendedBest) 3.dp else 1.dp)
   ) {
@@ -67,13 +94,13 @@ fun SafeWindowCard(
           Box(
             modifier = Modifier
               .size(28.dp)
-              .background(if (window.isCurrentTimeInside) SeaGreen else PrimaryBlueLight, CircleShape),
+              .background(if (window.isCurrentTimeInside) (if (isDarkMode) SeaGreen else Color(0xFF059669)) else (if (isDarkMode) PrimaryBlueLight else Color(0xFFDBEAFE)), CircleShape),
             contentAlignment = Alignment.Center
           ) {
             Icon(
               imageVector = if (window.isCurrentTimeInside) Icons.Default.CheckCircle else Icons.Default.Schedule,
               contentDescription = null,
-              tint = if (window.isCurrentTimeInside) Color.White else PrimaryBlue,
+              tint = if (window.isCurrentTimeInside) Color.White else (if (isDarkMode) MarineCyan else PrimaryBlue),
               modifier = Modifier.size(16.dp)
             )
           }
@@ -81,7 +108,7 @@ fun SafeWindowCard(
           Text(
             text = "Pencere #${window.id}",
             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-            color = TextPrimary,
+            color = textPrimary,
             softWrap = true
           )
 
@@ -89,7 +116,7 @@ fun SafeWindowCard(
             Spacer(modifier = Modifier.width(6.dp))
             Surface(
               shape = RoundedCornerShape(6.dp),
-              color = PrimaryBlueLight,
+              color = if (isDarkMode) PrimaryBlueLight else Color(0xFFDBEAFE),
               border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryBlueBorder)
             ) {
               Row(
@@ -99,14 +126,14 @@ fun SafeWindowCard(
                 Icon(
                   imageVector = Icons.Default.Star,
                   contentDescription = null,
-                  tint = PrimaryBlue,
+                  tint = if (isDarkMode) MarineCyan else PrimaryBlue,
                   modifier = Modifier.size(11.dp)
                 )
                 Spacer(modifier = Modifier.width(2.dp))
                 Text(
                   text = "EN İYİ",
                   style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold, fontSize = 9.sp),
-                  color = PrimaryBlue
+                  color = if (isDarkMode) MarineCyan else PrimaryBlue
                 )
               }
             }
@@ -135,8 +162,8 @@ fun SafeWindowCard(
       Row(
         modifier = Modifier
           .fillMaxWidth()
-          .background(CardSubtle, RoundedCornerShape(12.dp))
-          .border(1.dp, CardBorder, RoundedCornerShape(12.dp))
+          .background(subtleBg, RoundedCornerShape(12.dp))
+          .border(1.dp, cardBorder, RoundedCornerShape(12.dp))
           .padding(14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -145,13 +172,13 @@ fun SafeWindowCard(
           Text(
             text = "GÜVENLİ GİRİŞ - ÇIKIŞ SAATİ",
             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp),
-            color = TextMuted
+            color = textMuted
           )
           Spacer(modifier = Modifier.height(2.dp))
           Text(
             text = "${window.startTimeFormatted} - ${window.endTimeFormatted}",
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
-            color = TextPrimary
+            color = textPrimary
           )
         }
 
@@ -159,7 +186,7 @@ fun SafeWindowCard(
           Text(
             text = "AÇIK SÜRE",
             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp),
-            color = TextMuted
+            color = textMuted
           )
           Spacer(modifier = Modifier.height(2.dp))
           val hours = window.durationMinutes / 60
@@ -168,7 +195,7 @@ fun SafeWindowCard(
           Text(
             text = durStr,
             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-            color = SeaGreen
+            color = if (isDarkMode) SeaGreen else Color(0xFF059669)
           )
         }
       }
@@ -183,40 +210,40 @@ fun SafeWindowCard(
         Column(
           modifier = Modifier
             .weight(1f)
-            .background(CardSubtle, RoundedCornerShape(10.dp))
-            .border(1.dp, CardBorder, RoundedCornerShape(10.dp))
+            .background(subtleBg, RoundedCornerShape(10.dp))
+            .border(1.dp, cardBorder, RoundedCornerShape(10.dp))
             .padding(8.dp),
           horizontalAlignment = Alignment.CenterHorizontally
         ) {
-          Text(text = "Pik HW", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+          Text(text = "Pik HW", style = MaterialTheme.typography.labelSmall, color = textMuted)
           Text(text = window.peakTimeFormatted, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = PrimaryBlue)
         }
 
         Column(
           modifier = Modifier
             .weight(1f)
-            .background(CardSubtle, RoundedCornerShape(10.dp))
-            .border(1.dp, CardBorder, RoundedCornerShape(10.dp))
+            .background(subtleBg, RoundedCornerShape(10.dp))
+            .border(1.dp, cardBorder, RoundedCornerShape(10.dp))
             .padding(8.dp),
           horizontalAlignment = Alignment.CenterHorizontally
         ) {
-          Text(text = "Maksimum Su", style = MaterialTheme.typography.labelSmall, color = TextMuted)
-          Text(text = "${window.maxWaterDepthMeters} m", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = TextPrimary)
+          Text(text = "Maksimum Su", style = MaterialTheme.typography.labelSmall, color = textMuted)
+          Text(text = "${window.maxWaterDepthMeters} m", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = textPrimary)
         }
 
         Column(
           modifier = Modifier
             .weight(1f)
-            .background(CardSubtle, RoundedCornerShape(10.dp))
-            .border(1.dp, CardBorder, RoundedCornerShape(10.dp))
+            .background(subtleBg, RoundedCornerShape(10.dp))
+            .border(1.dp, cardBorder, RoundedCornerShape(10.dp))
             .padding(8.dp),
           horizontalAlignment = Alignment.CenterHorizontally
         ) {
-          Text(text = "Pik UKC Payı", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+          Text(text = "Pik UKC Payı", style = MaterialTheme.typography.labelSmall, color = textMuted)
           Text(
             text = "+${window.maxUkcMeters} m",
             style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-            color = SeaGreen
+            color = if (isDarkMode) SeaGreen else Color(0xFF059669)
           )
         }
       }

@@ -2,19 +2,20 @@ package com.example.ui.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -28,16 +29,25 @@ fun SpeedVectorAnalysisCard(
   speedAnalysis: SpeedCalculationResult,
   onSyncGpsSpeed: () -> Unit,
   onRequestGps: () -> Unit,
+  isDarkMode: Boolean = false,
   modifier: Modifier = Modifier
 ) {
+  var isExpanded by rememberSaveable { mutableStateOf(false) }
+  val cardBg = getMarineCardBg(isDarkMode)
+  val cardBorder = getMarineCardBorder(isDarkMode)
+  val subtleBg = getMarineSubtleBg(isDarkMode)
+  val subtleBorder = getMarineSubtleBorder(isDarkMode)
+  val textPrimary = getMarineTextPrimary(isDarkMode)
+  val textMuted = getMarineTextMuted(isDarkMode)
+
   Card(
     modifier = modifier
       .fillMaxWidth()
       .testTag("card_speed_vector_analysis"),
     shape = RoundedCornerShape(16.dp),
-    colors = CardDefaults.cardColors(containerColor = CardWhite),
+    colors = CardDefaults.cardColors(containerColor = cardBg),
     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-    border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
+    border = androidx.compose.foundation.BorderStroke(1.dp, cardBorder)
   ) {
     Column(
       modifier = Modifier
@@ -46,7 +56,7 @@ fun SpeedVectorAnalysisCard(
     ) {
       // 1. Başlık
       Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable { isExpanded = !isExpanded },
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
       ) {
@@ -54,34 +64,30 @@ fun SpeedVectorAnalysisCard(
           Box(
             modifier = Modifier
               .size(36.dp)
-              .background(PrimaryBlueLight, RoundedCornerShape(10.dp)),
+              .background(if (isDarkMode) PrimaryBlueLight else Color(0xFFDBEAFE), RoundedCornerShape(10.dp)),
             contentAlignment = Alignment.Center
           ) {
             Icon(
               imageVector = Icons.Default.Speed,
               contentDescription = null,
-              tint = MarineCyan,
+              tint = if (isDarkMode) MarineCyan else PrimaryBlueDark,
               modifier = Modifier.size(20.dp)
             )
           }
           Spacer(modifier = Modifier.width(10.dp))
           Column {
             Text(
-              text = "GPS Sürati & Yere Göre Sürat",
+              text = "Yere Göre Sürat",
               style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-              color = TextPrimary
-            )
-            Text(
-              text = "SOG (Ground Speed) vs STW (Water Speed) Vektör Analizi",
-              style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-              color = TextMuted
+              color = textPrimary
             )
           }
         }
 
         Surface(
           shape = RoundedCornerShape(6.dp),
-          color = if (speedAnalysis.isGpsActive) SeaGreenDark else CardSubtle
+          color = if (speedAnalysis.isGpsActive) (if (isDarkMode) SeaGreenDark else Color(0xFFD1FAE5)) else subtleBg,
+          border = androidx.compose.foundation.BorderStroke(1.dp, if (speedAnalysis.isGpsActive) SeaGreenBorder else subtleBorder)
         ) {
           Text(
             text = if (speedAnalysis.isGpsActive) "🛰️ GPS AKTİF" else "STATİK MOD",
@@ -89,13 +95,15 @@ fun SpeedVectorAnalysisCard(
               fontWeight = FontWeight.Black,
               fontSize = 9.sp
             ),
-            color = if (speedAnalysis.isGpsActive) SeaGreen else TextMuted,
+            color = if (speedAnalysis.isGpsActive) (if (isDarkMode) SeaGreen else Color(0xFF059669)) else textMuted,
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
           )
         }
       }
 
-      Spacer(modifier = Modifier.height(14.dp))
+      AnimatedVisibility(visible = isExpanded) {
+        Column {
+          Spacer(modifier = Modifier.height(14.dp))
 
       // 2. Yan Yana 3 Ana Sürat Kutusu
       Row(
@@ -105,10 +113,10 @@ fun SpeedVectorAnalysisCard(
         // A) GPS Sürati (SOG)
         Surface(
           shape = RoundedCornerShape(12.dp),
-          color = if (speedAnalysis.isGpsActive) SeaGreenDark else CardSubtle,
+          color = if (speedAnalysis.isGpsActive) (if (isDarkMode) SeaGreenDark else Color(0xFFD1FAE5)) else subtleBg,
           border = androidx.compose.foundation.BorderStroke(
             1.dp,
-            if (speedAnalysis.isGpsActive) SeaGreenBorder else CardSubtleBorder
+            if (speedAnalysis.isGpsActive) SeaGreenBorder else subtleBorder
           ),
           modifier = Modifier.weight(1f)
         ) {
@@ -121,12 +129,12 @@ fun SpeedVectorAnalysisCard(
             Text(
               text = "GPS Sürati",
               style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-              color = TextMuted
+              color = textMuted
             )
             Text(
               text = "SOG",
               style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 9.sp),
-              color = SeaGreen
+              color = if (speedAnalysis.isGpsActive) (if (isDarkMode) SeaGreen else Color(0xFF059669)) else textMuted
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
@@ -135,12 +143,12 @@ fun SpeedVectorAnalysisCard(
                 fontWeight = FontWeight.Black,
                 fontSize = 22.sp
               ),
-              color = if (speedAnalysis.isGpsActive) SeaGreen else TextPrimary
+              color = if (speedAnalysis.isGpsActive) (if (isDarkMode) SeaGreen else Color(0xFF059669)) else textPrimary
             )
             Text(
               text = "knot (kn)",
               style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-              color = TextMuted
+              color = textMuted
             )
           }
         }
@@ -148,8 +156,8 @@ fun SpeedVectorAnalysisCard(
         // B) Suya Göre Sürat (STW)
         Surface(
           shape = RoundedCornerShape(12.dp),
-          color = PrimaryBlueLight,
-          border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryBlueBorder),
+          color = subtleBg,
+          border = androidx.compose.foundation.BorderStroke(1.dp, subtleBorder),
           modifier = Modifier.weight(1f)
         ) {
           Column(
@@ -159,14 +167,14 @@ fun SpeedVectorAnalysisCard(
             horizontalAlignment = Alignment.CenterHorizontally
           ) {
             Text(
-              text = "Suya Göre Sürat",
+              text = "Su Sürati",
               style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-              color = TextMuted
+              color = textMuted
             )
             Text(
               text = "STW (Kütük)",
               style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 9.sp),
-              color = MarineCyan
+              color = if (isDarkMode) MarineCyan else PrimaryBlue
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
@@ -175,12 +183,12 @@ fun SpeedVectorAnalysisCard(
                 fontWeight = FontWeight.Black,
                 fontSize = 22.sp
               ),
-              color = MarineCyan
+              color = if (isDarkMode) MarineCyan else PrimaryBlue
             )
             Text(
               text = "knot (kn)",
               style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-              color = TextMuted
+              color = textMuted
             )
           }
         }
@@ -188,8 +196,8 @@ fun SpeedVectorAnalysisCard(
         // C) Yere Göre Hesaplanmış Sürat (V_ground)
         Surface(
           shape = RoundedCornerShape(12.dp),
-          color = CardSubtle,
-          border = androidx.compose.foundation.BorderStroke(1.dp, CardSubtleBorder),
+          color = subtleBg,
+          border = androidx.compose.foundation.BorderStroke(1.dp, subtleBorder),
           modifier = Modifier.weight(1f)
         ) {
           Column(
@@ -201,12 +209,12 @@ fun SpeedVectorAnalysisCard(
             Text(
               text = "Yere Göre Sürat",
               style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-              color = TextMuted
+              color = textMuted
             )
             Text(
               text = "Vektörel SOG",
               style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 9.sp),
-              color = WarningAmber
+              color = if (isDarkMode) WarningAmber else Color(0xFFD97706)
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
@@ -215,12 +223,12 @@ fun SpeedVectorAnalysisCard(
                 fontWeight = FontWeight.Black,
                 fontSize = 22.sp
               ),
-              color = WarningAmber
+              color = if (isDarkMode) WarningAmber else Color(0xFFD97706)
             )
             Text(
               text = "knot (kn)",
               style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-              color = TextMuted
+              color = textMuted
             )
           }
         }
@@ -231,7 +239,7 @@ fun SpeedVectorAnalysisCard(
       // 3. Akıntı ve Sürüklenme Değerlendirme Şeridi
       Surface(
         shape = RoundedCornerShape(10.dp),
-        color = if (speedAnalysis.deltaSpeedKnots >= 0) SeaGreenLight.copy(alpha = 0.6f) else WarningAmberLight,
+        color = if (speedAnalysis.deltaSpeedKnots >= 0) (if (isDarkMode) SeaGreenLight.copy(alpha = 0.6f) else Color(0xFFD1FAE5)) else (if (isDarkMode) WarningAmberLight else Color(0xFFFEF3C7)),
         border = androidx.compose.foundation.BorderStroke(
           1.dp,
           if (speedAnalysis.deltaSpeedKnots >= 0) SeaGreenBorder else WarningAmberBorder
@@ -252,21 +260,21 @@ fun SpeedVectorAnalysisCard(
               Icon(
                 imageVector = if (speedAnalysis.deltaSpeedKnots >= 0) Icons.Default.TrendingUp else Icons.Default.TrendingDown,
                 contentDescription = null,
-                tint = if (speedAnalysis.deltaSpeedKnots >= 0) SeaGreenDark else WarningAmberDark,
+                tint = if (speedAnalysis.deltaSpeedKnots >= 0) (if (isDarkMode) SeaGreen else Color(0xFF059669)) else (if (isDarkMode) WarningAmberDark else Color(0xFFB45309)),
                 modifier = Modifier.size(18.dp)
               )
               Spacer(modifier = Modifier.width(6.dp))
               Text(
                 text = "Hız Kazancı / Kaybı: ${if (speedAnalysis.deltaSpeedKnots > 0) "+" else ""}${speedAnalysis.deltaSpeedKnots} kn",
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                color = if (speedAnalysis.deltaSpeedKnots >= 0) SeaGreenDark else WarningAmberDark
+                color = if (speedAnalysis.deltaSpeedKnots >= 0) (if (isDarkMode) SeaGreen else Color(0xFF059669)) else (if (isDarkMode) WarningAmberDark else Color(0xFFB45309))
               )
             }
 
             Text(
               text = "COG: ${String.format("%03d°", speedAnalysis.groundCourseDegrees)}",
               style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
-              color = HeaderNavy
+              color = if (isDarkMode) MarineCyan else PrimaryBlueDark
             )
           }
 
@@ -274,12 +282,12 @@ fun SpeedVectorAnalysisCard(
           Text(
             text = speedAnalysis.speedEvaluationText,
             style = MaterialTheme.typography.bodySmall,
-            color = TextPrimary
+            color = if (isDarkMode) textPrimary else Color(0xFF1E293B)
           )
           Text(
             text = speedAnalysis.driftStatusText,
             style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-            color = TextMuted
+            color = if (isDarkMode) textMuted else Color(0xFF475569)
           )
         }
       }
@@ -290,13 +298,13 @@ fun SpeedVectorAnalysisCard(
       Text(
         text = "Vektörel Seyir Üçgeni (Su Sürati + Akıntı = Yere Göre Sürat)",
         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-        color = TextMuted
+        color = textMuted
       )
       Spacer(modifier = Modifier.height(6.dp))
 
       Surface(
         shape = RoundedCornerShape(10.dp),
-        color = Color(0xFF0F172A),
+        color = if (isDarkMode) Color(0xFF0B1322) else Color(0xFF1E293B),
         modifier = Modifier
           .fillMaxWidth()
           .height(130.dp)
@@ -364,18 +372,20 @@ fun SpeedVectorAnalysisCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
           Box(modifier = Modifier.size(8.dp).background(Color(0xFF38BDF8), RoundedCornerShape(2.dp)))
           Spacer(modifier = Modifier.width(4.dp))
-          Text("Su Sürati (STW)", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = TextMuted)
+          Text("Su Sürati (STW)", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = textMuted)
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
           Box(modifier = Modifier.size(8.dp).background(Color(0xFFF59E0B), RoundedCornerShape(2.dp)))
           Spacer(modifier = Modifier.width(4.dp))
-          Text("Akıntı (${speedAnalysis.currentSpeedKnots} kn)", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = TextMuted)
+          Text("Akıntı (${speedAnalysis.currentSpeedKnots} kn)", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = textMuted)
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
           Box(modifier = Modifier.size(8.dp).background(Color(0xFF34D399), RoundedCornerShape(2.dp)))
           Spacer(modifier = Modifier.width(4.dp))
-          Text("Yere Göre (SOG)", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = TextMuted)
+          Text("Yere Göre (SOG)", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = textMuted)
         }
+      }
+      }
       }
     }
   }

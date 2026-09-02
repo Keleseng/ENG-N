@@ -8,7 +8,18 @@ class CalculationRepository(private val dao: CalculationDao) {
   val allTideRecords: Flow<List<TideCalculationRecord>> = dao.getAllTideRecords()
 
   suspend fun saveAnchorCalculation(record: AnchorCalculationRecord): Long {
-    return dao.insertAnchorRecord(record)
+    val existing = dao.findDuplicateAnchorRecord(
+      vesselName = record.vesselName,
+      chainScopeMeters = record.chainScopeMeters,
+      depthMeters = record.depthMeters,
+      metersPerShackle = record.metersPerShackle
+    )
+    val recordToSave = if (existing != null) {
+      record.copy(id = existing.id, timestamp = System.currentTimeMillis())
+    } else {
+      record
+    }
+    return dao.insertAnchorRecord(recordToSave)
   }
 
   suspend fun deleteAnchorRecord(id: Long) {
@@ -20,7 +31,18 @@ class CalculationRepository(private val dao: CalculationDao) {
   }
 
   suspend fun saveTideCalculation(record: TideCalculationRecord): Long {
-    return dao.insertTideRecord(record)
+    val existing = dao.findDuplicateTideRecord(
+      portName = record.portName,
+      chartDatumDepthMeters = record.chartDatumDepthMeters,
+      shipDraftMeters = record.shipDraftMeters,
+      requiredUkcMeters = record.requiredUkcMeters
+    )
+    val recordToSave = if (existing != null) {
+      record.copy(id = existing.id, timestamp = System.currentTimeMillis())
+    } else {
+      record
+    }
+    return dao.insertTideRecord(recordToSave)
   }
 
   suspend fun deleteTideRecord(id: Long) {

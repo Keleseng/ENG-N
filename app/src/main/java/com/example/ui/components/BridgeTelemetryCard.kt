@@ -23,12 +23,20 @@ import com.example.ui.theme.*
 @Composable
 fun BridgeTelemetryCard(
   analysis: NavigationAnalysis,
+  isDarkMode: Boolean = false,
   onOpenAisMap: (() -> Unit)? = null,
   modifier: Modifier = Modifier
 ) {
+  val cardBg = getMarineCardBg(isDarkMode)
+  val cardBorder = getMarineCardBorder(isDarkMode)
+  val subtleBg = getMarineSubtleBg(isDarkMode)
+  val textPrimary = getMarineTextPrimary(isDarkMode)
+  val textSecondary = getMarineTextSecondary(isDarkMode)
+  val textMuted = getMarineTextMuted(isDarkMode)
+
   Card(
     shape = RoundedCornerShape(16.dp),
-    colors = CardDefaults.cardColors(containerColor = CardWhite),
+    colors = CardDefaults.cardColors(containerColor = cardBg),
     border = androidx.compose.foundation.BorderStroke(1.5.dp, PrimaryBlue),
     elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
     modifier = modifier
@@ -48,14 +56,14 @@ fun BridgeTelemetryCard(
         ) {
           Surface(
             shape = CircleShape,
-            color = PrimaryBlueLight,
+            color = if (isDarkMode) PrimaryBlueLight else Color(0xFFDBEAFE),
             modifier = Modifier.size(36.dp)
           ) {
             Box(contentAlignment = Alignment.Center) {
               Icon(
                 Icons.Default.Explore,
                 contentDescription = "Anlık Durum",
-                tint = PrimaryBlueDark,
+                tint = if (isDarkMode) MarineCyan else PrimaryBlueDark,
                 modifier = Modifier.size(20.dp)
               )
             }
@@ -65,13 +73,13 @@ fun BridgeTelemetryCard(
             Text(
               text = "Anlık durum",
               style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black, letterSpacing = 0.3.sp),
-              color = HeaderNavy,
+              color = textPrimary,
               softWrap = true
             )
             Text(
-              text = "${analysis.vessel.name} • Derinlik, Rota, Hız, Akıntı ve Vektör Analizi",
+              text = "${analysis.vessel.name} • Dinamik Derinlik ve Omurga Payı Analizi",
               style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-              color = TextMuted,
+              color = textMuted,
               softWrap = true
             )
           }
@@ -82,8 +90,8 @@ fun BridgeTelemetryCard(
             onClick = onOpenAisMap,
             shape = RoundedCornerShape(8.dp),
             colors = ButtonDefaults.filledTonalButtonColors(
-              containerColor = PrimaryBlueLight,
-              contentColor = PrimaryBlueDark
+              containerColor = if (isDarkMode) PrimaryBlueLight else Color(0xFFDBEAFE),
+              contentColor = if (isDarkMode) MarineCyan else PrimaryBlueDark
             ),
             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
             modifier = Modifier.testTag("btn_bridge_open_map")
@@ -100,15 +108,15 @@ fun BridgeTelemetryCard(
       // 1. ANA DERİNLİK HESAP BÖLÜMÜ (Mevki Harita Derinliği + Gelgit = Anlık Toplam Derinlik)
       Surface(
         shape = RoundedCornerShape(12.dp),
-        color = CardSubtle,
-        border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryBlueBorder),
+        color = subtleBg,
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (isDarkMode) MarineCyan.copy(alpha = 0.4f) else PrimaryBlue.copy(alpha = 0.3f)),
         modifier = Modifier.fillMaxWidth()
       ) {
         Column(modifier = Modifier.padding(12.dp)) {
           Text(
             text = "ANLIK SU DERİNLİĞİ HESAPLAMASI",
             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
-            color = PrimaryBlueDark
+            color = if (isDarkMode) MarineCyan else PrimaryBlueDark
           )
 
           Spacer(modifier = Modifier.height(8.dp))
@@ -123,12 +131,12 @@ fun BridgeTelemetryCard(
               Text(
                 text = "Harita (CD)",
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = TextMuted
+                color = textMuted
               )
               Text(
                 text = "${analysis.chartedDepthMeters} m",
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
-                color = TextPrimary
+                color = textPrimary
               )
             }
 
@@ -144,7 +152,7 @@ fun BridgeTelemetryCard(
               Text(
                 text = "Gelgit",
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = TextMuted
+                color = textMuted
               )
               Text(
                 text = "${if (analysis.currentInstantTideHeightMeters >= 0) "+" else ""}${analysis.currentInstantTideHeightMeters} m",
@@ -165,21 +173,21 @@ fun BridgeTelemetryCard(
               Text(
                 text = "TOPLAM SU",
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
-                color = HeaderNavy
+                color = if (isDarkMode) MarineCyan else PrimaryBlueDark
               )
               Text(
                 text = "${analysis.currentInstantTotalDepthMeters} m",
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
-                color = PrimaryBlueDark
+                color = if (isDarkMode) MarineCyan else PrimaryBlueDark
               )
             }
           }
 
           Spacer(modifier = Modifier.height(8.dp))
-          Divider(color = CardBorder, thickness = 1.dp)
+          Divider(color = cardBorder, thickness = 1.dp)
           Spacer(modifier = Modifier.height(8.dp))
 
-          // Anlık UKC Durumu (Dikeyde kelimelerin alt satıra topluca geçişini sağlayan düzen)
+          // Anlık UKC Durumu
           Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -200,7 +208,7 @@ fun BridgeTelemetryCard(
                 Text(
                   text = "Net UKC (Omurga Payı):",
                   style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                  color = TextSecondary
+                  color = textSecondary
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
@@ -212,196 +220,17 @@ fun BridgeTelemetryCard(
 
               Surface(
                 shape = RoundedCornerShape(6.dp),
-                color = if (analysis.isCurrentlySafe) SeaGreenLight else DangerRedLight,
+                color = if (analysis.isCurrentlySafe) (if (isDarkMode) SeaGreenLight else Color(0xFFD1FAE5)) else (if (isDarkMode) DangerRedLight else Color(0xFFFEE2E2)),
                 border = androidx.compose.foundation.BorderStroke(1.dp, if (analysis.isCurrentlySafe) SeaGreenBorder else DangerRedBorder)
               ) {
                 Text(
                   text = if (analysis.isCurrentlySafe) "GÜVENLİ" else "YETERSİZ",
                   style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 10.sp),
-                  color = if (analysis.isCurrentlySafe) SeaGreen else DangerRed,
+                  color = if (analysis.isCurrentlySafe) (if (isDarkMode) SeaGreen else Color(0xFF059669)) else DangerRed,
                   modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                 )
               }
             }
-          }
-        }
-      }
-
-      Spacer(modifier = Modifier.height(10.dp))
-
-      // 2. SEYİR HAREKETİ: GİDİLEN YÖN (ROTASI / COG) & HIZ (SOG)
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-      ) {
-        // Gidilen Yön / Rota
-        Surface(
-          shape = RoundedCornerShape(12.dp),
-          color = CardSubtle,
-          border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
-          modifier = Modifier.weight(1f)
-        ) {
-          Column(modifier = Modifier.padding(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-              Icon(
-                Icons.Default.Navigation,
-                contentDescription = "Rota",
-                tint = PrimaryBlue,
-                modifier = Modifier
-                  .size(16.dp)
-                  .rotate(analysis.vesselHeadingDegrees.toFloat())
-              )
-              Spacer(modifier = Modifier.width(4.dp))
-              Text(
-                text = "ROTA (COG)",
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = TextMuted
-              )
-            }
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-              text = String.format("%03d°", analysis.vesselHeadingDegrees),
-              style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
-              color = TextPrimary
-            )
-            Text(
-              text = analysis.vesselHeadingCardinal,
-              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp, lineHeight = 13.sp),
-              color = PrimaryBlueDark,
-              softWrap = true
-            )
-          }
-        }
-
-        // Anlık Hız (SOG)
-        Surface(
-          shape = RoundedCornerShape(12.dp),
-          color = CardSubtle,
-          border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
-          modifier = Modifier.weight(1f)
-        ) {
-          Column(modifier = Modifier.padding(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-              Icon(Icons.Default.Speed, contentDescription = "Hız", tint = PrimaryBlue, modifier = Modifier.size(16.dp))
-              Spacer(modifier = Modifier.width(4.dp))
-              Text(
-                text = "HIZ (SOG)",
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = TextMuted
-              )
-            }
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-              text = "${analysis.vesselSpeedKnots} kts",
-              style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
-              color = TextPrimary
-            )
-            Text(
-              text = "Squat: +${analysis.calculatedSquatMeters} m",
-              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp, lineHeight = 13.sp),
-              color = DangerRed,
-              softWrap = true
-            )
-          }
-        }
-      }
-
-      Spacer(modifier = Modifier.height(8.dp))
-
-      // 3. ÇEVRESEL VERİLER: AKINTI VE RÜZGAR BİLGİLERİ
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-      ) {
-        // Bölgenin Anlık Akıntısı
-        val curr = analysis.currentInfo
-        Surface(
-          shape = RoundedCornerShape(12.dp),
-          color = CardSubtle,
-          border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
-          modifier = Modifier.weight(1f)
-        ) {
-          Column(modifier = Modifier.padding(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-              Icon(
-                Icons.Default.Waves,
-                contentDescription = "Akıntı",
-                tint = PrimaryBlue,
-                modifier = Modifier
-                  .size(16.dp)
-                  .rotate(curr.directionDegrees.toFloat())
-              )
-              Spacer(modifier = Modifier.width(4.dp))
-              Text(
-                text = "AKINTI",
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = TextMuted
-              )
-            }
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-              text = "${curr.speedKnots} kts • ${String.format("%03d°", curr.directionDegrees)}",
-              style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black),
-              color = HeaderNavy
-            )
-            Text(
-              text = curr.phaseName,
-              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp, lineHeight = 13.sp),
-              color = PrimaryBlueDark,
-              softWrap = true
-            )
-            Text(
-              text = curr.directionCardinal,
-              style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, lineHeight = 12.sp),
-              color = TextSecondary,
-              softWrap = true
-            )
-          }
-        }
-
-        // Bölgenin Anlık Rüzgarı
-        val wind = analysis.windInfo
-        Surface(
-          shape = RoundedCornerShape(12.dp),
-          color = CardSubtle,
-          border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
-          modifier = Modifier.weight(1f)
-        ) {
-          Column(modifier = Modifier.padding(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-              Icon(
-                Icons.Default.Air,
-                contentDescription = "Rüzgar",
-                tint = PrimaryBlue,
-                modifier = Modifier
-                  .size(16.dp)
-                  .rotate(wind.directionDegrees.toFloat())
-              )
-              Spacer(modifier = Modifier.width(4.dp))
-              Text(
-                text = "RÜZGAR",
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = TextMuted
-              )
-            }
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-              text = "${wind.speedKnots} kts • ${String.format("%03d°", wind.directionDegrees)}",
-              style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black),
-              color = HeaderNavy
-            )
-            Text(
-              text = "Beaufort ${wind.beaufortScale} • ${wind.directionCardinal}",
-              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp, lineHeight = 13.sp),
-              color = PrimaryBlueDark,
-              softWrap = true
-            )
-            Text(
-              text = wind.seaStateDescription,
-              style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, lineHeight = 12.sp),
-              color = TextSecondary,
-              softWrap = true
-            )
           }
         }
       }
