@@ -58,15 +58,15 @@ fun TideCurveCanvas(
     modifier = modifier
       .fillMaxWidth()
       .testTag("tide_curve_card"),
-    shape = RoundedCornerShape(16.dp),
+    shape = RoundedCornerShape(12.dp),
     colors = CardDefaults.cardColors(containerColor = CardWhite),
     border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
-    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
   ) {
     Column(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(12.dp)
+        .padding(10.dp)
     ) {
       // Üst Başlık ve İnteraktif Bilgi Çubuğu
       Row(
@@ -77,67 +77,67 @@ fun TideCurveCanvas(
         Column {
           Text(
             text = "24 Saatlik Gelgit Eğrisi & Su Derinliği",
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
             color = TextPrimary
           )
           Text(
-            text = "Grafiğe dokunarak veya kaydırarak saatlik derinliği inceleyin",
-            style = MaterialTheme.typography.bodySmall,
+            text = "Grafiğe dokunarak saatlik derinliği inceleyin",
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
             color = TextSecondary
           )
         }
 
         if (inspectedHour != null) {
           Surface(
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(6.dp),
             color = PrimaryBlueLight,
             border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryBlueBorder)
           ) {
             Text(
               text = "Saat: ${activePoint?.timeFormatted ?: ""}",
-              style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
               color = PrimaryBlue,
-              modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+              modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
             )
           }
         }
       }
 
-      Spacer(modifier = Modifier.height(12.dp))
+      Spacer(modifier = Modifier.height(8.dp))
 
       // İnteraktif İnceleme Gösterge Paneli
       activePoint?.let { point ->
         Row(
           modifier = Modifier
             .fillMaxWidth()
-            .background(CardSubtle, RoundedCornerShape(12.dp))
-            .border(1.dp, CardBorder, RoundedCornerShape(12.dp))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .background(CardSubtle, RoundedCornerShape(8.dp))
+            .border(1.dp, CardBorder, RoundedCornerShape(8.dp))
+            .padding(horizontal = 8.dp, vertical = 6.dp),
           horizontalArrangement = Arrangement.SpaceAround,
           verticalAlignment = Alignment.CenterVertically
         ) {
           Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text = "Seçili Saat", style = MaterialTheme.typography.labelSmall, color = TextMuted)
-            Text(text = point.timeFormatted, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = TextPrimary)
+            Text(text = "Seçili Saat", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextMuted)
+            Text(text = point.timeFormatted, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = TextPrimary)
           }
           Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text = "Gelgit Seviyesi", style = MaterialTheme.typography.labelSmall, color = TextMuted)
-            Text(text = "${if (point.tideHeight >= 0) "+" else ""}${point.tideHeight} m", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = PrimaryBlue)
+            Text(text = "Gelgit Seviyesi", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextMuted)
+            Text(text = "${if (point.tideHeight >= 0) "+" else ""}${point.tideHeight} m", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = PrimaryBlue)
           }
           Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text = "Toplam Su", style = MaterialTheme.typography.labelSmall, color = TextMuted)
-            Text(text = "${point.totalWaterDepth} m", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = TextPrimary)
+            Text(text = "Toplam Su", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextMuted)
+            Text(text = "${point.totalWaterDepth} m", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = TextPrimary)
           }
           Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text = "UKC Boşluğu", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+            Text(text = "UKC Boşluğu", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextMuted)
             Text(
               text = "${if (point.availableUkc >= 0) "+" else ""}${point.availableUkc} m",
-              style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+              style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
               color = if (point.isSafe) SeaGreen else DangerRed
             )
           }
           Surface(
-            shape = RoundedCornerShape(6.dp),
+            shape = RoundedCornerShape(4.dp),
             color = if (point.isSafe) SeaGreenLight else DangerRedLight,
             border = androidx.compose.foundation.BorderStroke(
               1.dp,
@@ -146,23 +146,23 @@ fun TideCurveCanvas(
           ) {
             Text(
               text = if (point.isSafe) "GÜVENLİ" else "RİSKLİ",
-              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold),
+              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold, fontSize = 9.sp),
               color = if (point.isSafe) SeaGreen else DangerRed,
-              modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+              modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
             )
           }
         }
       }
 
-      Spacer(modifier = Modifier.height(14.dp))
+      Spacer(modifier = Modifier.height(8.dp))
 
       // Canvas Çizim Alanı
       Box(
         modifier = Modifier
           .fillMaxWidth()
-          .height(230.dp)
-          .background(CardSubtle, RoundedCornerShape(12.dp))
-          .border(1.dp, CardBorder, RoundedCornerShape(12.dp))
+          .height(165.dp)
+          .background(CardSubtle, RoundedCornerShape(10.dp))
+          .border(1.dp, CardBorder, RoundedCornerShape(10.dp))
           .pointerInput(Unit) {
             detectTapGestures(
               onTap = { offset ->

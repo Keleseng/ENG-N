@@ -13,6 +13,8 @@ data class MarineWeather(
   val waveHeightMeters: Double, // Deniz Dalga Yüksekliği (metre)
   val wavePeriodSeconds: Double, // Dalga Periyodu (saniye)
   val waveDirectionDegrees: Int, // Dalga Yönü (derece)
+  val oceanCurrentSpeedKnots: Double = 0.0, // Akıntı Sürati (knot) - Copernicus Marine
+  val oceanCurrentDirectionDegrees: Int = 0, // Akıntı Yönü (derece 0-360) - Copernicus Marine
   val precipitationMm: Double, // Yağış Durumu (mm / saat)
   val precipitationStateText: String, // "Yağış Yok", "Hafif Yağmur", "Sağanak", vb.
   val weatherCode: Int, // WMO Weather Code

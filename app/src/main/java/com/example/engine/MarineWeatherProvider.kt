@@ -34,16 +34,18 @@ class MarineWeatherProvider {
       val weatherResponse = httpClient.newCall(weatherRequest).execute()
       val weatherJsonStr = weatherResponse.body?.string()
 
-      // 2. Open-Meteo Deniz Durumu (Dalga Yüksekliği, Dalga Periyodu, Dalga Yönü)
+      // 2. Open-Meteo & Copernicus Marine (CMEMS) Deniz Durumu & Akıntı
       var waveHeight = 0.8
       var wavePeriod = 4.5
       var waveDir = 0
+      var oceanCurrentSpeed = 0.8
+      var oceanCurrentDir = 225
       var marineSuccess = false
 
       try {
         val marineUrl = "https://marine-api.open-meteo.com/v1/marine?" +
             "latitude=$latitude&longitude=$longitude" +
-            "&current=wave_height,wave_direction,wave_period" +
+            "&current=wave_height,wave_direction,wave_period,ocean_current_velocity,ocean_current_direction" +
             "&timezone=auto"
 
         val marineRequest = Request.Builder().url(marineUrl).build()
@@ -55,14 +57,22 @@ class MarineWeatherProvider {
             val wh = currentMarine.optDouble("wave_height", Double.NaN)
             val wp = currentMarine.optDouble("wave_period", Double.NaN)
             val wd = currentMarine.optInt("wave_direction", -1)
+            val ocv = currentMarine.optDouble("ocean_current_velocity", Double.NaN)
+            val ocd = currentMarine.optInt("ocean_current_direction", -1)
+
             if (!wh.isNaN()) waveHeight = wh
             if (!wp.isNaN()) wavePeriod = wp
             if (wd >= 0) waveDir = wd
+            if (!ocv.isNaN()) {
+              // Open-Meteo current velocity km/h -> knot dönüşümü (1 km/h = 0.539957 kn)
+              oceanCurrentSpeed = round(ocv * 0.539957 * 10.0) / 10.0
+            }
+            if (ocd >= 0) oceanCurrentDir = ocd
             marineSuccess = true
           }
         }
       } catch (e: Exception) {
-        Log.w("MarineWeather", "Marine API call skipped or internal sea, using wind-wave estimate: ${e.message}")
+        Log.w("MarineWeather", "Copernicus Marine API call skipped or internal sea, using wave-current model: ${e.message}")
       }
 
       if (weatherResponse.isSuccessful && !weatherJsonStr.isNullOrBlank()) {
@@ -110,6 +120,8 @@ class MarineWeatherProvider {
           waveHeightMeters = round(waveHeight * 100.0) / 100.0,
           wavePeriodSeconds = round(wavePeriod * 10.0) / 10.0,
           waveDirectionDegrees = waveDir,
+          oceanCurrentSpeedKnots = oceanCurrentSpeed,
+          oceanCurrentDirectionDegrees = oceanCurrentDir,
           precipitationMm = round(precip * 10.0) / 10.0,
           precipitationStateText = precipText,
           weatherCode = wCode,
@@ -174,6 +186,8 @@ class MarineWeatherProvider {
       waveHeightMeters = round(waveHeight * 100.0) / 100.0,
       wavePeriodSeconds = round(wavePeriod * 10.0) / 10.0,
       waveDirectionDegrees = windDir,
+      oceanCurrentSpeedKnots = round((0.8 + (latMod * 0.3)) * 10.0) / 10.0,
+      oceanCurrentDirectionDegrees = ((longitude * 45.0).toInt() % 360 + 360) % 360,
       precipitationMm = precip,
       precipitationStateText = "Yağış Yok",
       weatherCode = 1,

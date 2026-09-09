@@ -19,7 +19,14 @@ class ExampleUnitTest {
 
   @Test
   fun testTideAnalysisProducesSafeWindows() {
-    val vessel = VesselPresets.defaultVessels[0]
+    val vessel = com.example.model.VesselProfile(
+      id = "test_ship",
+      name = "Test Ship",
+      blockCoefficient = 0.75,
+      draftMeters = 8.0,
+      defaultSpeedKnots = 6.0,
+      minUkcMeters = 1.0
+    )
     val port = LocationPresets.defaultPorts[0] // Dover
     val cal = Calendar.getInstance()
 

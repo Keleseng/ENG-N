@@ -23,25 +23,33 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
+enum class LocationSource {
+  NONE,
+  GPS,
+  AIS
+}
+
 data class TideUiState(
-  val selectedVessel: VesselProfile = VesselPresets.defaultVessels[0],
+  val selectedVessel: VesselProfile = VesselProfile(),
   val selectedPort: PortLocation = LocationPresets.defaultPorts[0],
   val isCustomPort: Boolean = false,
   val vesselName: String = "",
-  val mmsiStr: String = "222111447",
-  val imoStr: String = "7654320",
-  val callSignStr: String = "TST7",
-  val vesselTypeStr: String = "Military Ops",
-  val loaStr: String = "98.0",
-  val beamStr: String = "13.5",
-  val draftStr: String = "3.8",
-  val blockCoefficientStr: String = "0.55",
-  val latStr: String = "40.7180",
-  val lonStr: String = "29.8350",
-  val chartedDepthStr: String = "18.0",
+  val mmsiStr: String = "",
+  val imoStr: String = "",
+  val callSignStr: String = "",
+  val vesselTypeStr: String = "",
+  val loaStr: String = "",
+  val beamStr: String = "",
+  val draftStr: String = "",
+  val blockCoefficientStr: String = "0.70",
+  val latStr: String = "40.82833",
+  val lonStr: String = "29.25399",
+  val activeLocationSource: LocationSource = LocationSource.NONE,
+  val chartedDepthStr: String = "31.1",
   val ukcStr: String = "1.0",
   val speedStr: String = "0.0",
   val headingDegreesStr: String = "270", // İstanbul limanı yönü
+  val marineAttitude: MarineAttitude = MarineAttitude(),
   val selectedDateOffsetDays: Int = 0, // 0 = Bugün, 1 = Yarın, 2 = +2 gün
   val selectedTabIndex: Int = 0, // Default open in Input Parameters
   val inspectedHour: Double? = null,
@@ -87,7 +95,11 @@ data class TideUiState(
   val isShowSpeedVector: Boolean = true,
   val speedVectorMinutes: Int = 12,
   val isMeasureRulerActive: Boolean = false,
-  val isNightChartMode: Boolean = true
+  val isNightChartMode: Boolean = true,
+  val verifiedMarineDepth: com.example.engine.MarineDepthResult? = null,
+  val isDepthLoading: Boolean = false,
+  val selectedSimpleEtaDestination: com.example.model.SimpleDestination? = null,
+  val simpleEtaResult: com.example.model.SimpleEtaResult? = null
 )
 
 private fun calculateInitialAnchorResult(): AnchorCalculationResult {
@@ -110,10 +122,9 @@ private fun calculateInitialWeather(): MarineWeather {
 }
 
 private fun calculateInitialSpeedResult(): SpeedCalculationResult {
-  val vessel = VesselPresets.defaultVessels[0]
   return SpeedCalculationEngine.calculateSpeeds(
     gpsFix = null,
-    speedThroughWaterKnots = vessel.defaultSpeedKnots,
+    speedThroughWaterKnots = 0.0,
     vesselHeadingDegrees = 45,
     currentSpeedKnots = 1.2,
     currentDirectionDegrees = 220,
@@ -123,7 +134,7 @@ private fun calculateInitialSpeedResult(): SpeedCalculationResult {
 }
 
 private fun calculateInitialAnalysis(): NavigationAnalysis {
-  val vessel = VesselPresets.defaultVessels[0]
+  val vessel = VesselProfile()
   val port = LocationPresets.defaultPorts[0]
   val cal = Calendar.getInstance()
   return TideCalculatorEngine.analyzeNavigation(
@@ -152,7 +163,7 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
 
   init {
     syncRealMoonData()
-    refreshWeather()
+    fetchDepthFromMmsiVessel()
     observeCalculationHistory()
   }
 
@@ -186,11 +197,92 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
     }
   }
 
+
+  /**
+   * MMSI bilgileri girilen geminin (uiState.mmsiStr) AIS mevkisinden koordinatları alır,
+   * koordinatlar penceresini günceller ve derinlik penceresi bilgilerini (EMODnet Bathymetry)
+   * doğrudan bu geminin bulunduğu konumdan çeker.
+   */
+  fun fetchDepthFromMmsiVessel(mmsiOverride: String? = null) {
+    val mmsiToTrack = (mmsiOverride ?: _uiState.value.mmsiStr).trim()
+    viewModelScope.launch {
+      _uiState.update { it.copy(isDepthLoading = true) }
+      try {
+        val aisData = com.example.engine.AisTrackingEngine.fetchAisDataByMmsi(mmsiToTrack)
+        val shipLat = aisData.latitude
+        val shipLon = aisData.longitude
+        val latFormatted = com.example.model.LocationPresets.formatMarineLatDMS(shipLat)
+        val lonFormatted = com.example.model.LocationPresets.formatMarineLonDMS(shipLon)
+
+        val depthResult = com.example.engine.MarineDepthProvider.fetchMarineDepth(shipLat, shipLon)
+
+        _uiState.update { current ->
+          val updated = current.copy(
+            vesselName = aisData.name.ifBlank { current.vesselName },
+            mmsiStr = aisData.mmsi,
+            latStr = latFormatted,
+            lonStr = lonFormatted,
+            isCustomPort = true,
+            verifiedMarineDepth = depthResult,
+            chartedDepthStr = String.format(Locale.US, "%.1f", depthResult.depthMeters),
+            isDepthLoading = false,
+            activeAisVesselData = aisData,
+            activeMarineTrafficUrl = aisData.marineTrafficUrl
+          )
+          val speedRes = computeSpeedCalculation(updated)
+          val anchorRes = computeAnchorCalculation(updated)
+          updated.copy(
+            analysis = computeAnalysis(updated),
+            speedCalculationResult = speedRes,
+            anchorCalculationResult = anchorRes
+          )
+        }
+        val weather = weatherProvider.fetchMarineWeather(shipLat, shipLon)
+        _uiState.update { it.copy(marineWeather = weather) }
+      } catch (e: Exception) {
+        _uiState.update { it.copy(isDepthLoading = false) }
+      }
+    }
+  }
+
+  fun fetchVerifiedDepth(lat: Double? = null, lon: Double? = null) {
+    if (lat == null && lon == null && _uiState.value.mmsiStr.isNotBlank()) {
+      fetchDepthFromMmsiVessel()
+      return
+    }
+    viewModelScope.launch {
+      val targetLat = lat ?: com.example.model.LocationPresets.parseCoordinateOrDecimal(_uiState.value.latStr) ?: _uiState.value.selectedPort.latitude
+      val targetLon = lon ?: com.example.model.LocationPresets.parseCoordinateOrDecimal(_uiState.value.lonStr) ?: _uiState.value.selectedPort.longitude
+      _uiState.update { it.copy(isDepthLoading = true) }
+      try {
+        val result = com.example.engine.MarineDepthProvider.fetchMarineDepth(targetLat, targetLon)
+        _uiState.update { current ->
+          val updated = current.copy(
+            verifiedMarineDepth = result,
+            isDepthLoading = false,
+            // Derinlik bilgisini aynı zamanda seyir derinliği alanına da senkronize edebiliriz
+            chartedDepthStr = String.format(Locale.US, "%.1f", result.depthMeters)
+          )
+          val speedRes = computeSpeedCalculation(updated)
+          val anchorRes = computeAnchorCalculation(updated)
+          updated.copy(
+            analysis = computeAnalysis(updated),
+            speedCalculationResult = speedRes,
+            anchorCalculationResult = anchorRes
+          )
+        }
+      } catch (e: Exception) {
+        _uiState.update { it.copy(isDepthLoading = false) }
+      }
+    }
+  }
+
   fun refreshWeather() {
     viewModelScope.launch {
-      val lat = _uiState.value.latStr.toDoubleOrNull() ?: _uiState.value.selectedPort.latitude
-      val lon = _uiState.value.lonStr.toDoubleOrNull() ?: _uiState.value.selectedPort.longitude
+      val lat = com.example.model.LocationPresets.parseCoordinateOrDecimal(_uiState.value.latStr) ?: _uiState.value.selectedPort.latitude
+      val lon = com.example.model.LocationPresets.parseCoordinateOrDecimal(_uiState.value.lonStr) ?: _uiState.value.selectedPort.longitude
       val weather = weatherProvider.fetchMarineWeather(lat, lon)
+      fetchVerifiedDepth(lat, lon)
       _uiState.update { current ->
         val updated = current.copy(marineWeather = weather)
         val speedRes = computeSpeedCalculation(updated)
@@ -235,6 +327,8 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
       val updated = current.copy(
         selectedVessel = preset,
         vesselName = preset.name,
+        mmsiStr = preset.mmsi,
+        vesselTypeStr = preset.typeName,
         loaStr = newLoa.toString(),
         beamStr = preset.beamMeters.toString(),
         draftStr = preset.draftMeters.toString(),
@@ -365,6 +459,10 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
     }
   }
 
+  fun updateMarineAttitude(attitude: MarineAttitude) {
+    _uiState.update { it.copy(marineAttitude = attitude) }
+  }
+
   fun updateVesselName(value: String) {
     _uiState.update { current ->
       val updated = current.copy(vesselName = value)
@@ -374,6 +472,10 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
 
   fun updateMmsi(value: String) {
     _uiState.update { it.copy(mmsiStr = value) }
+    val clean = value.trim().filter { it.isDigit() }
+    if (clean.length == 9) {
+      fetchDepthFromMmsiVessel(clean)
+    }
   }
 
   fun updateImo(value: String) {
@@ -395,6 +497,21 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
     }
   }
 
+  fun setSimpleEtaDestination(dest: com.example.model.SimpleDestination?) {
+    _uiState.update { current ->
+      val updated = current.copy(selectedSimpleEtaDestination = dest)
+      updated.copy(simpleEtaResult = computeSimpleEta(updated))
+    }
+  }
+
+  private fun computeSimpleEta(state: TideUiState): com.example.model.SimpleEtaResult? {
+    val dest = state.selectedSimpleEtaDestination ?: return null
+    val lat = com.example.model.LocationPresets.parseCoordinateOrDecimal(state.latStr) ?: return null
+    val lon = com.example.model.LocationPresets.parseCoordinateOrDecimal(state.lonStr) ?: return null
+    val speed = state.lastGpsFix?.speedKnots ?: state.activeAisVesselData?.sogKnots ?: state.speedStr.toDoubleOrNull() ?: 0.0
+    return com.example.model.calculateSimpleEta(lat, lon, speed, dest)
+  }
+
   fun setShowAisDetailDialog(show: Boolean) {
     _uiState.update { it.copy(showAisDetailDialog = show) }
   }
@@ -407,9 +524,9 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
    * Girilen MMSI numarasından veya hedef gemiden AIS konum takibini başlatır.
    */
   fun startMmsiTracking(mmsiOverride: String? = null) {
-    val mmsiToTrack = mmsiOverride ?: _uiState.value.mmsiStr
+    val mmsiToTrack = (mmsiOverride ?: _uiState.value.mmsiStr).trim()
     if (mmsiToTrack.isBlank()) {
-      _uiState.update { it.copy(aisErrorMessage = "Lütfen geçerli bir MMSI numarası giriniz (örn: 222111447).") }
+      _uiState.update { it.copy(aisErrorMessage = "Lütfen geçerli bir MMSI veya IMO numarası giriniz.") }
       return
     }
 
@@ -423,14 +540,14 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
             isAisLoading = false,
             isMmsiTrackingActive = true,
             activeAisVesselData = aisData,
-            aisSuccessMessage = "🛰️ MMSI (${aisData.mmsi} - ${aisData.name}) AIS Canlı Konum Takibi Başlatıldı!"
+            aisSuccessMessage = "🛰️ ${aisData.name} (MMSI: ${aisData.mmsi}, IMO: ${aisData.imo}) bilgileri başarıyla çekildi!"
           )
         }
       } catch (e: Exception) {
         _uiState.update {
           it.copy(
             isAisLoading = false,
-            aisErrorMessage = "AIS konumu alınamadı: ${e.localizedMessage ?: "Bağlantı hatası"}"
+            aisErrorMessage = "AIS bilgileri alınamadı: ${e.localizedMessage ?: "Bağlantı hatası"}"
           )
         }
       }
@@ -461,14 +578,14 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
           activeAisVesselData = aisData,
           showAisDetailDialog = true,
           activeMarineTrafficUrl = com.example.engine.AisTrackingEngine.userAtlanticZoneUrl,
-          aisSuccessMessage = "🌊 VesselFinder (MMSI: 222111447) Canlı Harita ve Seyir Bilgileri Yüklendi!"
+          aisSuccessMessage = "🌊 AIS Canlı Harita ve Seyir Bilgileri Yüklendi!"
         )
       }
     }
   }
 
   /**
-   * VesselFinder Bölgesi AIS Canlı Bilgilerini Getirir.
+   * AIS Bölgesi Canlı Bilgilerini Getirir.
    */
   fun loadUserMarineTrafficZone() {
     viewModelScope.launch {
@@ -482,14 +599,14 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
           activeAisVesselData = aisData,
           showAisDetailDialog = true,
           activeMarineTrafficUrl = com.example.engine.AisTrackingEngine.userMarineTrafficZoneUrl,
-          aisSuccessMessage = "🌊 VesselFinder (MMSI: 222111447) Canlı Harita Bilgileri Yüklendi!"
+          aisSuccessMessage = "🌊 AIS Canlı Harita Bilgileri Yüklendi!"
         )
       }
     }
   }
 
   /**
-   * VesselFinder özel gemi AIS bilgilerini çeker ve uygulamaya yükler.
+   * AIS özel gemi bilgilerini çeker ve uygulamaya yükler.
    */
   fun loadMarineTrafficShip10481795() {
     viewModelScope.launch {
@@ -503,7 +620,7 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
           activeAisVesselData = shipData,
           showAisDetailDialog = true,
           activeMarineTrafficUrl = shipData.marineTrafficUrl,
-          aisSuccessMessage = "⚓ VesselFinder (MMSI: 222111447) Harita ve AIS verileri başarıyla yüklendi!"
+          aisSuccessMessage = "⚓ AIS Harita ve Seyir Verileri Başarıyla Yüklendi!"
         )
       }
     }
@@ -513,8 +630,8 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
    * Gelen AIS verilerini ve telemetriyi form girdilerine, haritaya ve hesaplamalara uygular.
    */
   fun applyAisVesselData(data: AisVesselData) {
-    val latFormatted = String.format(Locale.US, "%.5f", data.latitude)
-    val lonFormatted = String.format(Locale.US, "%.5f", data.longitude)
+    val latFormatted = com.example.model.LocationPresets.formatMarineLatDMS(data.latitude)
+    val lonFormatted = com.example.model.LocationPresets.formatMarineLonDMS(data.longitude)
     val sogFormatted = String.format(Locale.US, "%.1f", data.sogKnots)
     val headingFormatted = String.format(Locale.US, "%03d", data.headingDegrees)
     val bridgeToHawse = String.format(Locale.US, "%.1f", (data.loaMeters * 0.25).coerceAtLeast(10.0))
@@ -522,7 +639,7 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
 
     _uiState.update { current ->
       val updated = current.copy(
-        vesselName = data.name.ifBlank { "NB252" },
+        vesselName = data.name.ifBlank { current.vesselName },
         mmsiStr = data.mmsi,
         imoStr = data.imo,
         callSignStr = data.callSign,
@@ -550,6 +667,7 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
       )
     }
     refreshWeather()
+    fetchVerifiedDepth(data.latitude, data.longitude)
   }
 
   /**
@@ -592,10 +710,11 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
   /**
    * Tüm GPS verilerini (Mevki, SOG, COG, İrtifa, Hassasiyet) eksiksiz deniz parametrelerine dönüştürür ve uygular.
    */
-  fun syncAllGpsToMarineParameters() {
+  fun syncAllGpsToMarineParameters(formatAsDms: Boolean = true) {
+    _uiState.update { it.copy(activeLocationSource = LocationSource.GPS) }
     val currentFix = _uiState.value.lastGpsFix
     if (currentFix != null) {
-      applyGpsFix(currentFix, isExplicitSync = true)
+      applyGpsFix(currentFix, isExplicitSync = true, formatAsDms = formatAsDms)
     } else {
       _uiState.update {
         it.copy(
@@ -607,8 +726,47 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
     }
   }
 
-  fun syncGpsTelemetryToInputs() {
-    syncAllGpsToMarineParameters()
+  fun syncAisShipPosition() {
+    val aisVessel = _uiState.value.activeAisVesselData ?: com.example.engine.AisTrackingEngine.getNb252ShipData()
+    val latFormatted = com.example.model.LocationPresets.formatMarineLatDMS(aisVessel.latitude)
+    val lonFormatted = com.example.model.LocationPresets.formatMarineLonDMS(aisVessel.longitude)
+    _uiState.update { current ->
+      val updated = current.copy(
+        latStr = latFormatted,
+        lonStr = lonFormatted,
+        speedStr = String.format(Locale.US, "%.1f", aisVessel.sogKnots),
+        headingDegreesStr = String.format(Locale.US, "%03d", aisVessel.headingDegrees),
+        vesselName = aisVessel.name.ifBlank { current.vesselName },
+        mmsiStr = aisVessel.mmsi.ifBlank { current.mmsiStr },
+        imoStr = aisVessel.imo.ifBlank { current.imoStr },
+        callSignStr = aisVessel.callSign.ifBlank { current.callSignStr },
+        vesselTypeStr = aisVessel.shipType.ifBlank { current.vesselTypeStr },
+        loaStr = if (aisVessel.loaMeters > 0) String.format(Locale.US, "%.1f", aisVessel.loaMeters) else current.loaStr,
+        beamStr = if (aisVessel.beamMeters > 0) String.format(Locale.US, "%.1f", aisVessel.beamMeters) else current.beamStr,
+        draftStr = if (aisVessel.draftMeters > 0) String.format(Locale.US, "%.1f", aisVessel.draftMeters) else current.draftStr,
+        isCustomPort = true,
+        activeAisVesselData = aisVessel,
+        activeLocationSource = LocationSource.AIS,
+        aisSuccessMessage = "⚓ AIS Verileri (${aisVessel.name}) ve Tüm Telemetri Aktarıldı! (AIS Aktif)"
+      )
+      val speedRes = computeSpeedCalculation(updated)
+      val simpleEta = computeSimpleEta(updated)
+      updated.copy(
+        analysis = computeAnalysis(updated),
+        speedCalculationResult = speedRes,
+        simpleEtaResult = simpleEta
+      )
+    }
+    fetchVerifiedDepth(aisVessel.latitude, aisVessel.longitude)
+  }
+
+  fun syncGpsTelemetryToInputs(asDms: Boolean = true) {
+    val currentFix = _uiState.value.lastGpsFix
+    if (currentFix != null) {
+      applyGpsFix(currentFix, isExplicitSync = true, formatAsDms = asDms)
+    } else {
+      syncAllGpsToMarineParameters(formatAsDms = asDms)
+    }
   }
 
   fun setGpsLoading(loading: Boolean) {
@@ -623,9 +781,29 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
     _uiState.update { it.copy(gpsErrorMessage = null, gpsSuccessMessage = null) }
   }
 
-  fun applyGpsFix(fix: GpsFix, isExplicitSync: Boolean = false) {
-    val latFormatted = String.format(Locale.US, "%.5f", fix.latitude)
-    val lonFormatted = String.format(Locale.US, "%.5f", fix.longitude)
+  fun applyGpsFix(fix: GpsFix, isExplicitSync: Boolean = false, formatAsDms: Boolean = true) {
+    // AIS aktifken kullanıcı açıkça "GPS VERİSİ" butonuna basana kadar GPS verilerine kendiliğinden dönülmez
+    if (!isExplicitSync && _uiState.value.activeLocationSource == LocationSource.AIS) {
+      _uiState.update { current ->
+        current.copy(
+          isGpsLoading = false,
+          lastGpsFix = fix
+        )
+      }
+      return
+    }
+
+    fetchVerifiedDepth(fix.latitude, fix.longitude)
+    val latFormatted = if (formatAsDms) {
+      com.example.model.LocationPresets.formatMarineLatDMS(fix.latitude)
+    } else {
+      String.format(Locale.US, "%.5f", fix.latitude)
+    }
+    val lonFormatted = if (formatAsDms) {
+      com.example.model.LocationPresets.formatMarineLonDMS(fix.longitude)
+    } else {
+      String.format(Locale.US, "%.5f", fix.longitude)
+    }
 
     // En yakın stratejik liman / boğazı bul
     var nearestLocationName: String? = null
@@ -638,20 +816,21 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
       }
     }
 
-    val marinePos = LocationPresets.formatMarineCoordinates(fix.latitude, fix.longitude)
+    val marinePos = com.example.model.LocationPresets.formatMarineDmsCoordinates(fix.latitude, fix.longitude)
     val sogKnots = fix.speedKnots ?: 0.0
     val cogDeg = fix.bearingDegrees?.toInt() ?: 0
     val altitudeStr = if (fix.altitudeMeters != null) "${String.format(Locale.US, "%.1f", fix.altitudeMeters)} m" else "0.0 m (Deniz Seviyesi)"
     val accuracyStr = "±${String.format(Locale.US, "%.1f", fix.accuracyMeters)} m"
 
     val successMsg = if (isExplicitSync) {
-      "🌊 TÜM GPS BİLGİLERİ DENİZ PARAMETRELERİNE AKTARILDI!\n" +
+      "🌊 DENİZ GPS KOORDİNATLARI (DMS) VE TELEMETRİ AKTARILDI!\n" +
       "• Mevki (Deniz GPS): $marinePos\n" +
       "• SOG (Hız): ${String.format(Locale.US, "%.1f", sogKnots)} kn | COG (Rota): ${String.format(Locale.US, "%03d", cogDeg)}°\n" +
       "• İrtifa: $altitudeStr | GPS Hassasiyeti: $accuracyStr\n" +
+      "• EMODnet Bathymetry: Koordinata göre derinlik doğrulanıyor...\n" +
       "• En Yakın Deniz Bölgesi: ${nearestLocationName ?: "Açık Deniz"}"
     } else {
-      "🛰️ Canlı GPS: $marinePos • SOG: ${String.format(Locale.US, "%.1f", sogKnots)} kn • COG: ${String.format(Locale.US, "%03d", cogDeg)}° • $accuracyStr"
+      "🛰️ Canlı GPS (DMS): $marinePos • SOG: ${String.format(Locale.US, "%.1f", sogKnots)} kn • COG: ${String.format(Locale.US, "%03d", cogDeg)}° • $accuracyStr"
     }
 
     _uiState.update { current ->
@@ -689,15 +868,18 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
         speedStr = speedStrUpdated,
         headingDegreesStr = headingStrUpdated,
         isCustomPort = true,
+        activeLocationSource = LocationSource.GPS,
         gpsNearestPortInfo = nearestLocationName,
         gpsSuccessMessage = successMsg,
         gpsErrorMessage = null,
         trackHistory = updatedTrack
       )
       val speedRes = computeSpeedCalculation(updated)
+      val simpleEta = computeSimpleEta(updated)
       updated.copy(
         analysis = computeAnalysis(updated),
-        speedCalculationResult = speedRes
+        speedCalculationResult = speedRes,
+        simpleEtaResult = simpleEta
       )
     }
     // Refresh weather asynchronously on new fix
@@ -709,10 +891,11 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
   }
 
   fun triggerMob() {
-    val lat = _uiState.value.latStr.toDoubleOrNull() ?: _uiState.value.selectedPort.latitude
-    val lon = _uiState.value.lonStr.toDoubleOrNull() ?: _uiState.value.selectedPort.longitude
-    val heading = _uiState.value.headingDegreesStr.toIntOrNull() ?: 0
-    val speed = _uiState.value.speedStr.toDoubleOrNull() ?: 0.0
+    val currentFix = _uiState.value.lastGpsFix
+    val lat = currentFix?.latitude ?: (com.example.model.LocationPresets.parseCoordinateOrDecimal(_uiState.value.latStr) ?: _uiState.value.selectedPort.latitude)
+    val lon = currentFix?.longitude ?: (com.example.model.LocationPresets.parseCoordinateOrDecimal(_uiState.value.lonStr) ?: _uiState.value.selectedPort.longitude)
+    val heading = currentFix?.bearingDegrees?.toInt() ?: (_uiState.value.headingDegreesStr.toIntOrNull() ?: 0)
+    val speed = currentFix?.speedKnots ?: (_uiState.value.speedStr.toDoubleOrNull() ?: 0.0)
     val timeNow = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
 
     val mob = MobEvent(
@@ -742,8 +925,8 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
   }
 
   fun dropAnchor(customLat: Double? = null, customLon: Double? = null) {
-    val lat = customLat ?: (_uiState.value.latStr.toDoubleOrNull() ?: _uiState.value.selectedPort.latitude)
-    val lon = customLon ?: (_uiState.value.lonStr.toDoubleOrNull() ?: _uiState.value.selectedPort.longitude)
+    val lat = customLat ?: (com.example.model.LocationPresets.parseCoordinateOrDecimal(_uiState.value.latStr) ?: _uiState.value.selectedPort.latitude)
+    val lon = customLon ?: (com.example.model.LocationPresets.parseCoordinateOrDecimal(_uiState.value.lonStr) ?: _uiState.value.selectedPort.longitude)
     val depth = _uiState.value.chartedDepthStr.toDoubleOrNull() ?: 10.0
     val timeNow = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
 
@@ -1072,8 +1255,8 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
     val loa = state.loaStr.toDoubleOrNull() ?: state.selectedVessel.loaMeters
     val beam = state.beamStr.toDoubleOrNull() ?: state.selectedVessel.beamMeters
     val draft = state.draftStr.toDoubleOrNull() ?: state.selectedVessel.draftMeters
-    val lat = state.latStr.toDoubleOrNull() ?: state.selectedPort.latitude
-    val lon = state.lonStr.toDoubleOrNull() ?: state.selectedPort.longitude
+    val lat = com.example.model.LocationPresets.parseCoordinateOrDecimal(state.latStr) ?: state.selectedPort.latitude
+    val lon = com.example.model.LocationPresets.parseCoordinateOrDecimal(state.lonStr) ?: state.selectedPort.longitude
     val chartedDepth = state.chartedDepthStr.toDoubleOrNull() ?: state.selectedPort.defaultChartedDepthMeters
     val ukc = state.ukcStr.toDoubleOrNull() ?: state.selectedVessel.minUkcMeters
     val speed = state.speedStr.toDoubleOrNull() ?: state.selectedVessel.defaultSpeedKnots
@@ -1173,8 +1356,8 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
   }
 
   fun addManualTrackPoint() {
-    val lat = _uiState.value.latStr.toDoubleOrNull() ?: _uiState.value.selectedPort.latitude
-    val lon = _uiState.value.lonStr.toDoubleOrNull() ?: _uiState.value.selectedPort.longitude
+    val lat = com.example.model.LocationPresets.parseCoordinateOrDecimal(_uiState.value.latStr) ?: _uiState.value.selectedPort.latitude
+    val lon = com.example.model.LocationPresets.parseCoordinateOrDecimal(_uiState.value.lonStr) ?: _uiState.value.selectedPort.longitude
     val speed = _uiState.value.speedStr.toDoubleOrNull() ?: 0.0
     val heading = _uiState.value.headingDegreesStr.toIntOrNull() ?: 0
     val timeNow = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())

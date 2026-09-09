@@ -3,6 +3,6 @@
     <item
         android:width="66dp"
         android:height="66dp"
-        android:drawable="@drawable/img_app_icon"
+        android:drawable="@drawable/denizci_yellow_anchor_icon_1788678191537"
         android:gravity="center" />
 </layer-list>

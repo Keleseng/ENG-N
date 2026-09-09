@@ -35,15 +35,15 @@ fun BridgeTelemetryCard(
   val textMuted = getMarineTextMuted(isDarkMode)
 
   Card(
-    shape = RoundedCornerShape(16.dp),
+    shape = RoundedCornerShape(12.dp),
     colors = CardDefaults.cardColors(containerColor = cardBg),
-    border = androidx.compose.foundation.BorderStroke(1.5.dp, PrimaryBlue),
-    elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+    border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryBlue.copy(alpha = 0.6f)),
+    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     modifier = modifier
       .fillMaxWidth()
       .testTag("bridge_telemetry_card")
   ) {
-    Column(modifier = Modifier.padding(14.dp)) {
+    Column(modifier = Modifier.padding(10.dp)) {
       // Başlık
       Row(
         modifier = Modifier.fillMaxWidth(),
@@ -57,28 +57,28 @@ fun BridgeTelemetryCard(
           Surface(
             shape = CircleShape,
             color = if (isDarkMode) PrimaryBlueLight else Color(0xFFDBEAFE),
-            modifier = Modifier.size(36.dp)
+            modifier = Modifier.size(28.dp)
           ) {
             Box(contentAlignment = Alignment.Center) {
               Icon(
                 Icons.Default.Explore,
                 contentDescription = "Anlık Durum",
                 tint = if (isDarkMode) MarineCyan else PrimaryBlueDark,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(16.dp)
               )
             }
           }
-          Spacer(modifier = Modifier.width(10.dp))
+          Spacer(modifier = Modifier.width(8.dp))
           Column {
             Text(
               text = "Anlık durum",
-              style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black, letterSpacing = 0.3.sp),
+              style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
               color = textPrimary,
               softWrap = true
             )
             Text(
-              text = "${analysis.vessel.name} • Dinamik Derinlik ve Omurga Payı Analizi",
-              style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+              text = "${analysis.vessel.name} • Dinamik Derinlik & UKC",
+              style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
               color = textMuted,
               softWrap = true
             )
@@ -88,38 +88,38 @@ fun BridgeTelemetryCard(
         if (onOpenAisMap != null) {
           FilledTonalButton(
             onClick = onOpenAisMap,
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(6.dp),
             colors = ButtonDefaults.filledTonalButtonColors(
               containerColor = if (isDarkMode) PrimaryBlueLight else Color(0xFFDBEAFE),
               contentColor = if (isDarkMode) MarineCyan else PrimaryBlueDark
             ),
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-            modifier = Modifier.testTag("btn_bridge_open_map")
+            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+            modifier = Modifier.height(28.dp).testTag("btn_bridge_open_map")
           ) {
-            Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(14.dp))
-            Spacer(modifier = Modifier.width(4.dp))
-            Text("Harita", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+            Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(12.dp))
+            Spacer(modifier = Modifier.width(3.dp))
+            Text("Harita", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp))
           }
         }
       }
 
-      Spacer(modifier = Modifier.height(12.dp))
+      Spacer(modifier = Modifier.height(8.dp))
 
       // 1. ANA DERİNLİK HESAP BÖLÜMÜ (Mevki Harita Derinliği + Gelgit = Anlık Toplam Derinlik)
       Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(10.dp),
         color = subtleBg,
-        border = androidx.compose.foundation.BorderStroke(1.dp, if (isDarkMode) MarineCyan.copy(alpha = 0.4f) else PrimaryBlue.copy(alpha = 0.3f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (isDarkMode) MarineCyan.copy(alpha = 0.3f) else PrimaryBlue.copy(alpha = 0.2f)),
         modifier = Modifier.fillMaxWidth()
       ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(8.dp)) {
           Text(
             text = "ANLIK SU DERİNLİĞİ HESAPLAMASI",
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 9.sp),
             color = if (isDarkMode) MarineCyan else PrimaryBlueDark
           )
 
-          Spacer(modifier = Modifier.height(8.dp))
+          Spacer(modifier = Modifier.height(6.dp))
 
           Row(
             modifier = Modifier.fillMaxWidth(),
@@ -130,19 +130,19 @@ fun BridgeTelemetryCard(
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
               Text(
                 text = "Harita (CD)",
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                 color = textMuted
               )
               Text(
                 text = "${analysis.chartedDepthMeters} m",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                 color = textPrimary
               )
             }
 
             Text(
               text = "+",
-              style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+              style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
               color = PrimaryBlue,
               modifier = Modifier.padding(horizontal = 2.dp)
             )
@@ -151,19 +151,19 @@ fun BridgeTelemetryCard(
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
               Text(
                 text = "Gelgit",
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                 color = textMuted
               )
               Text(
                 text = "${if (analysis.currentInstantTideHeightMeters >= 0) "+" else ""}${analysis.currentInstantTideHeightMeters} m",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                 color = if (analysis.currentInstantTideHeightMeters >= 0) SeaGreen else DangerRed
               )
             }
 
             Text(
               text = "=",
-              style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+              style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
               color = PrimaryBlue,
               modifier = Modifier.padding(horizontal = 2.dp)
             )
@@ -172,64 +172,59 @@ fun BridgeTelemetryCard(
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1.2f)) {
               Text(
                 text = "TOPLAM SU",
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 10.sp),
                 color = if (isDarkMode) MarineCyan else PrimaryBlueDark
               )
               Text(
                 text = "${analysis.currentInstantTotalDepthMeters} m",
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
                 color = if (isDarkMode) MarineCyan else PrimaryBlueDark
               )
             }
           }
 
-          Spacer(modifier = Modifier.height(8.dp))
+          Spacer(modifier = Modifier.height(6.dp))
           Divider(color = cardBorder, thickness = 1.dp)
-          Spacer(modifier = Modifier.height(8.dp))
+          Spacer(modifier = Modifier.height(6.dp))
 
-          // Anlık UKC Durumu
-          Column(
+          // Anlık Net UKC Durumu
+          Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
           ) {
-            Row(
-              modifier = Modifier.fillMaxWidth(),
-              horizontalArrangement = Arrangement.SpaceBetween,
-              verticalAlignment = Alignment.CenterVertically
-            ) {
-              Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                  if (analysis.isCurrentlySafe) Icons.Default.CheckCircle else Icons.Default.Warning,
-                  contentDescription = null,
-                  tint = if (analysis.isCurrentlySafe) SeaGreen else DangerRed,
-                  modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                  text = "Net UKC (Omurga Payı):",
-                  style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                  color = textSecondary
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                  text = "+${analysis.currentInstantUkcMeters} m",
-                  style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Black),
-                  color = if (analysis.isCurrentlySafe) SeaGreen else DangerRed
-                )
-              }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+              Icon(
+                if (analysis.isCurrentlySafe) Icons.Default.CheckCircle else Icons.Default.Warning,
+                contentDescription = null,
+                tint = if (analysis.isCurrentlySafe) SeaGreen else DangerRed,
+                modifier = Modifier.size(14.dp)
+              )
+              Spacer(modifier = Modifier.width(4.dp))
+              Text(
+                text = "Net UKC:",
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                color = textSecondary
+              )
+              Spacer(modifier = Modifier.width(4.dp))
+              Text(
+                text = "+${analysis.currentInstantUkcMeters} m",
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
+                color = if (analysis.isCurrentlySafe) SeaGreen else DangerRed
+              )
+            }
 
-              Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = if (analysis.isCurrentlySafe) (if (isDarkMode) SeaGreenLight else Color(0xFFD1FAE5)) else (if (isDarkMode) DangerRedLight else Color(0xFFFEE2E2)),
-                border = androidx.compose.foundation.BorderStroke(1.dp, if (analysis.isCurrentlySafe) SeaGreenBorder else DangerRedBorder)
-              ) {
-                Text(
-                  text = if (analysis.isCurrentlySafe) "GÜVENLİ" else "YETERSİZ",
-                  style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 10.sp),
-                  color = if (analysis.isCurrentlySafe) (if (isDarkMode) SeaGreen else Color(0xFF059669)) else DangerRed,
-                  modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                )
-              }
+            Surface(
+              shape = RoundedCornerShape(4.dp),
+              color = if (analysis.isCurrentlySafe) (if (isDarkMode) SeaGreenLight else Color(0xFFD1FAE5)) else (if (isDarkMode) DangerRedLight else Color(0xFFFEE2E2)),
+              border = androidx.compose.foundation.BorderStroke(1.dp, if (analysis.isCurrentlySafe) SeaGreenBorder else DangerRedBorder)
+            ) {
+              Text(
+                text = if (analysis.isCurrentlySafe) "GÜVENLİ" else "YETERSİZ",
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 9.sp),
+                color = if (analysis.isCurrentlySafe) (if (isDarkMode) SeaGreen else Color(0xFF059669)) else DangerRed,
+                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+              )
             }
           }
         }

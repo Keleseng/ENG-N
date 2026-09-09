@@ -28,7 +28,7 @@ import com.example.ui.TideUiState
 import com.example.ui.theme.*
 
 /**
- * MarineTraffic AIS Canlı Harita Görünümü (Sadece MarineTraffic Sayfası)
+ * Canlı AIS Harita Görünümü
  * URL: https://www.marinetraffic.com/en/ais/home/centerx:29.301/centery:40.836/zoom:13
  */
 @SuppressLint("SetJavaScriptEnabled")
@@ -51,7 +51,7 @@ fun MarineMapView(
     modifier = modifier
       .fillMaxSize()
       .background(if (isDark) Color(0xFF0B132B) else Color(0xFFF1F5F9))
-      .testTag("screen_marine_traffic_map")
+      .testTag("screen_marinetraffic_map")
   ) {
     // ══════════════════════════════════════════════════════════════════════
     // MARINETRAFFIC WEBVIEW HARİTASI (TAM EKRAN)
@@ -62,6 +62,7 @@ fun MarineMapView(
         .testTag("webview_marinetraffic_map"),
       factory = { ctx ->
         WebView(ctx).apply {
+          setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null)
           layoutParams = ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.MATCH_PARENT
@@ -77,7 +78,7 @@ fun MarineMapView(
             useWideViewPort = true
             cacheMode = WebSettings.LOAD_DEFAULT
             loadsImagesAutomatically = true
-            userAgentString = "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 MarineTrafficNav/1.0"
+            userAgentString = "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 MarineNav/1.0"
           }
           webViewClient = object : WebViewClient() {
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
@@ -89,6 +90,21 @@ fun MarineMapView(
             override fun onPageFinished(view: WebView?, url: String?) {
               super.onPageFinished(view, url)
               isLoading = false
+
+              if (isDark) {
+                view?.evaluateJavascript(
+                  """
+                  (function() {
+                    var style = document.createElement('style');
+                    style.innerHTML = 'html { filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(85%); background: #121212 !important; } iframe, img, canvas { filter: invert(100%) hue-rotate(180deg) !important; }';
+                    document.head.appendChild(style);
+                  })();
+                  """.trimIndent(),
+                  null
+                )
+              }
+              
+              view?.evaluateJavascript(com.example.engine.MapOverlayInjector.getInjectableJavascript(uiState), null)
             }
 
             override fun onReceivedError(
@@ -165,7 +181,7 @@ fun MarineMapView(
           )
           Spacer(modifier = Modifier.height(10.dp))
           Text(
-            text = "MarineTraffic Haritası Yüklenemedi",
+            text = "AIS Canlı Haritası Yüklenemedi",
             style = MaterialTheme.typography.titleSmall,
             color = getMarineTextPrimary(isDark)
           )

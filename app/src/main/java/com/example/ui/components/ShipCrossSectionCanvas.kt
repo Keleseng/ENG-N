@@ -62,15 +62,15 @@ fun ShipCrossSectionCanvas(
     modifier = modifier
       .fillMaxWidth()
       .testTag("ship_cross_section_card"),
-    shape = RoundedCornerShape(16.dp),
+    shape = RoundedCornerShape(12.dp),
     colors = CardDefaults.cardColors(containerColor = CardWhite),
     border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
-    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
   ) {
     Column(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(12.dp)
+        .padding(10.dp)
     ) {
       Row(
         modifier = Modifier.fillMaxWidth(),
@@ -80,18 +80,18 @@ fun ShipCrossSectionCanvas(
         Column {
           Text(
             text = "Gemi Hidrostatik & Derinlik Kesiti",
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
             color = TextPrimary
           )
           Text(
-            text = "${analysis.vessel.name} (Boy: ${analysis.vessel.loaMeters}m, En: ${analysis.vessel.beamMeters}m)",
-            style = MaterialTheme.typography.bodySmall,
+            text = "${analysis.vessel.name} (${analysis.vessel.loaMeters}m × ${analysis.vessel.beamMeters}m)",
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
             color = PrimaryBlue
           )
         }
 
         Surface(
-          shape = RoundedCornerShape(8.dp),
+          shape = RoundedCornerShape(6.dp),
           color = if (isUkcSafe) SeaGreenLight else DangerRedLight,
           border = androidx.compose.foundation.BorderStroke(
             1.dp,
@@ -99,35 +99,35 @@ fun ShipCrossSectionCanvas(
           )
         ) {
           Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically
           ) {
             Icon(
               imageVector = if (isUkcSafe) Icons.Default.Info else Icons.Default.Warning,
               contentDescription = null,
               tint = if (isUkcSafe) SeaGreen else DangerRed,
-              modifier = Modifier.size(16.dp)
+              modifier = Modifier.size(13.dp)
             )
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(3.dp))
             Text(
               text = if (isUkcSafe) "UKC GÜVENLİ" else "UKC RİSKLİ",
-              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.sp),
               color = if (isUkcSafe) SeaGreen else DangerRed
             )
           }
         }
       }
 
-      Spacer(modifier = Modifier.height(10.dp))
+      Spacer(modifier = Modifier.height(8.dp))
 
       // 2D Kesit Çizimi Canvas
       Box(
         modifier = Modifier
           .fillMaxWidth()
-          .height(230.dp)
-          .background(HeaderNavy, RoundedCornerShape(12.dp))
-          .border(1.dp, CardBorder, RoundedCornerShape(12.dp))
-          .padding(8.dp)
+          .height(165.dp)
+          .background(HeaderNavy, RoundedCornerShape(10.dp))
+          .border(1.dp, CardBorder, RoundedCornerShape(10.dp))
+          .padding(6.dp)
       ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
           val w: Float = size.width
@@ -220,54 +220,69 @@ fun ShipCrossSectionCanvas(
           // Gemi Gövdesi (Hull Polygon)
           val hullTopY: Float = waterLineY - 32.dp.toPx()
           val hullHalfWidth: Float = shipBeamPx / 2f
+          val keelHalfWidth: Float = hullHalfWidth * 0.70f
+          val bottomY: Float = waterLineY + draftPx
 
           val hullPath = Path().apply {
             moveTo(shipCenter - hullHalfWidth, hullTopY)
             lineTo(shipCenter + hullHalfWidth, hullTopY)
-            // Bordadan omurgaya doğru kavis
-            lineTo(shipCenter + (hullHalfWidth * 0.85f), waterLineY + draftPx)
-            lineTo(shipCenter - (hullHalfWidth * 0.85f), waterLineY + draftPx)
+            // Bordadan omurgaya doğru kavis (sintine)
+            lineTo(shipCenter + hullHalfWidth, bottomY - 12.dp.toPx())
+            quadraticBezierTo(
+                shipCenter + hullHalfWidth, bottomY,
+                shipCenter + keelHalfWidth, bottomY
+            )
+            lineTo(shipCenter - keelHalfWidth, bottomY)
+            quadraticBezierTo(
+                shipCenter - hullHalfWidth, bottomY,
+                shipCenter - hullHalfWidth, bottomY - 12.dp.toPx()
+            )
             close()
           }
 
-          // Gövde boyaması (Kırmızı karina altı / Koyu bordo)
+          // Gövde boyaması (Su üstü koyu gri, su altı kırmızı)
           drawPath(
             path = hullPath,
             brush = Brush.verticalGradient(
-              colors = listOf(Color(0xFF334155), Color(0xFF1E293B), Color(0xFFDC2626)),
+              0.0f to Color(0xFF1E293B),
+              (waterLineY - hullTopY) / (bottomY - hullTopY) to Color(0xFF1E293B),
+              (waterLineY - hullTopY) / (bottomY - hullTopY) to Color(0xFFB91C1C),
+              1.0f to Color(0xFF7F1D1D),
               startY = hullTopY,
-              endY = waterLineY + draftPx
+              endY = bottomY
             )
           )
 
           drawPath(
             path = hullPath,
             color = Color.White.copy(alpha = 0.85f),
-            style = Stroke(width = 2.dp.toPx())
+            style = Stroke(width = 1.dp.toPx())
           )
 
-          // Köprüüstü (Superstructure)
-          val bridgeW: Float = shipBeamPx * 0.45f
-          val bridgeH: Float = 26.dp.toPx()
-          drawRoundRect(
-            color = Color(0xFFF8FAFC),
-            topLeft = Offset(shipCenter - (bridgeW / 2f), hullTopY - bridgeH),
-            size = Size(bridgeW, bridgeH),
-            cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
-          )
+          // Köprüüstü (Çok katlı)
+          val deck1W = shipBeamPx * 0.8f
+          val deck1H = 10.dp.toPx()
+          val deck1Y = hullTopY - deck1H
+          drawRoundRect(color = Color(0xFFF1F5F9), topLeft = Offset(shipCenter - deck1W / 2, deck1Y), size = Size(deck1W, deck1H), cornerRadius = CornerRadius(2.dp.toPx()))
+
+          val deck2W = shipBeamPx * 0.65f
+          val deck2H = 12.dp.toPx()
+          val deck2Y = deck1Y - deck2H
+          drawRoundRect(color = Color(0xFFE2E8F0), topLeft = Offset(shipCenter - deck2W / 2, deck2Y), size = Size(deck2W, deck2H), cornerRadius = CornerRadius(2.dp.toPx()))
+
+          val bridgeW = shipBeamPx * 0.45f
+          val bridgeH = 14.dp.toPx()
+          val bridgeY = deck2Y - bridgeH
+          drawRoundRect(color = Color(0xFFFFFFFF), topLeft = Offset(shipCenter - bridgeW / 2, bridgeY), size = Size(bridgeW, bridgeH), cornerRadius = CornerRadius(4.dp.toPx()))
+
           // Köprüüstü pencereleri
-          drawRect(
-            color = Color(0xFF0284C7),
-            topLeft = Offset(shipCenter - (bridgeW / 2f) + 6.dp.toPx(), hullTopY - bridgeH + 6.dp.toPx()),
-            size = Size(bridgeW - 12.dp.toPx(), 8.dp.toPx())
-          )
-          // Radar direği
-          drawLine(
-            color = Color(0xFF94A3B8),
-            start = Offset(shipCenter, hullTopY - bridgeH),
-            end = Offset(shipCenter, hullTopY - bridgeH - 12.dp.toPx()),
-            strokeWidth = 2.dp.toPx()
-          )
+          val windowW = bridgeW * 0.7f
+          val windowH = 6.dp.toPx()
+          drawRect(color = Color(0xFF0369A1), topLeft = Offset(shipCenter - windowW / 2, bridgeY + 4.dp.toPx()), size = Size(windowW, windowH))
+
+          // Radar direği ve tarayıcı
+          drawLine(color = Color(0xFF94A3B8), start = Offset(shipCenter, bridgeY), end = Offset(shipCenter, bridgeY - 18.dp.toPx()), strokeWidth = 2.dp.toPx())
+          drawLine(color = Color(0xFF475569), start = Offset(shipCenter - 10.dp.toPx(), bridgeY - 14.dp.toPx()), end = Offset(shipCenter + 10.dp.toPx(), bridgeY - 14.dp.toPx()), strokeWidth = 4.dp.toPx())
 
           // Squat (Çökelme Alanı Gösterimi)
           val squatPath = Path().apply {
@@ -417,14 +432,14 @@ private fun InfoChip(
 ) {
   Column(
     modifier = modifier
-      .background(CardSubtle, RoundedCornerShape(8.dp))
-      .border(1.dp, CardBorder, RoundedCornerShape(8.dp))
-      .padding(8.dp),
+      .background(CardSubtle, RoundedCornerShape(6.dp))
+      .border(1.dp, CardBorder, RoundedCornerShape(6.dp))
+      .padding(horizontal = 4.dp, vertical = 4.dp),
     horizontalAlignment = Alignment.CenterHorizontally
   ) {
-    Text(text = title, style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = TextMuted, maxLines = 1)
-    Spacer(modifier = Modifier.height(2.dp))
-    Text(text = value, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = TextPrimary, maxLines = 1)
+    Text(text = title, style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.sp), color = TextMuted, maxLines = 1)
+    Spacer(modifier = Modifier.height(1.dp))
+    Text(text = value, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp), color = TextPrimary, maxLines = 1)
   }
 }
 

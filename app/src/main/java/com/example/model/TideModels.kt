@@ -108,4 +108,8 @@ data class NavigationAnalysis(
   val advisoryBadge: String,
   val advisorySummary: String,
   val safetyChecklist: List<Pair<String, Boolean>>
-)
+) {
+  val formulaUkcMarginMeters: Double
+    get() = kotlin.math.round((chartedDepthMeters + currentInstantTideHeightMeters - actualDraftMeters - calculatedSquatMeters - minUkcMeters) * 100.0) / 100.0
+}
+

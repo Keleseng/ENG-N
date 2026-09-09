@@ -48,10 +48,10 @@ fun RealisticMoonPhaseCard(
   val textMuted = getMarineTextMuted(isDarkMode)
 
   Card(
-    shape = RoundedCornerShape(14.dp),
+    shape = RoundedCornerShape(12.dp),
     colors = CardDefaults.cardColors(containerColor = cardBg),
     border = androidx.compose.foundation.BorderStroke(1.dp, cardBorder),
-    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     modifier = modifier
       .fillMaxWidth()
       .testTag("realistic_moon_phase_card")
@@ -59,7 +59,7 @@ fun RealisticMoonPhaseCard(
     Column(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(12.dp)
+        .padding(10.dp)
     ) {
       // 1. Kart Başlığı ve Tarih
       Row(
@@ -74,14 +74,14 @@ fun RealisticMoonPhaseCard(
           Surface(
             shape = CircleShape,
             color = if (isDarkMode) PrimaryBlueLight else Color(0xFFDBEAFE),
-            modifier = Modifier.size(28.dp)
+            modifier = Modifier.size(24.dp)
           ) {
             Box(contentAlignment = Alignment.Center) {
               Icon(
                 Icons.Default.Brightness2,
                 contentDescription = "Ay Evresi",
                 tint = if (isDarkMode) MarineCyan else PrimaryBlueDark,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(14.dp)
               )
             }
           }
@@ -89,13 +89,13 @@ fun RealisticMoonPhaseCard(
           Column {
             Text(
               text = "AY EVRESİ & ÇEKİM GÜCÜ",
-              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 11.5.sp, letterSpacing = 0.5.sp),
+              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 10.sp, letterSpacing = 0.5.sp),
               color = textPrimary,
               softWrap = true
             )
             Text(
               text = "Astronomik Çekim & Gelgit Genliği",
-              style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+              style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
               color = textMuted,
               softWrap = true
             )
@@ -103,7 +103,7 @@ fun RealisticMoonPhaseCard(
         }
 
         Surface(
-          shape = RoundedCornerShape(6.dp),
+          shape = RoundedCornerShape(4.dp),
           color = if (isSpringTide) DangerRedLight else if (isNeapTide) PrimaryBlueLight else SeaGreenLight,
           border = androidx.compose.foundation.BorderStroke(
             1.dp,
@@ -111,35 +111,35 @@ fun RealisticMoonPhaseCard(
           )
         ) {
           Text(
-            text = if (isSpringTide) "SPRING (SIZIL)" else if (isNeapTide) "NEAP (ÖLÜ)" else "NORMAL GELGİT",
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 8.5.sp),
+            text = if (isSpringTide) "SPRING" else if (isNeapTide) "NEAP" else "NORMAL GELGİT",
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 8.sp),
             color = if (isSpringTide) DangerRed else if (isNeapTide) PrimaryBlueDark else SeaGreen,
-            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
           )
         }
       }
 
-      Spacer(modifier = Modifier.height(10.dp))
+      Spacer(modifier = Modifier.height(6.dp))
 
       // 2. Uzay Arka Planı Üzerinde Gerçekçi 3D Ay Görünümü
       Surface(
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(8.dp),
         color = HeaderNavy,
         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E3A8A)),
         modifier = Modifier.fillMaxWidth()
       ) {
-        Column(modifier = Modifier.padding(10.dp)) {
+        Column(modifier = Modifier.padding(8.dp)) {
           Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
           ) {
             // Gerçekçi Ay Çizim Kanvası
             RealisticMoonCanvas(
               moonPhaseName = analysis.moonPhaseName,
               illuminationPercent = analysis.moonIlluminationPercent,
               modifier = Modifier
-                .size(60.dp)
+                .size(48.dp)
                 .clip(CircleShape)
             )
 
@@ -152,14 +152,14 @@ fun RealisticMoonPhaseCard(
               ) {
                 Text(
                   text = analysis.moonPhaseName,
-                  style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black, fontSize = 13.sp),
+                  style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black, fontSize = 11.5.sp),
                   color = Color(0xFFFEF3C7),
                   softWrap = true,
                   modifier = Modifier.weight(1f, fill = false)
                 )
                 Text(
                   text = "%${analysis.moonIlluminationPercent} Aydınlık",
-                  style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.5.sp),
+                  style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 8.5.sp),
                   color = Color(0xFF93C5FD)
                 )
               }
@@ -168,7 +168,7 @@ fun RealisticMoonPhaseCard(
 
               Text(
                 text = "Gelgit Genliği: ×${String.format(java.util.Locale.US, "%.2f", factorValue)}",
-                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
+                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
                 color = if (isSpringTide) Color(0xFFFCA5A5) else if (isNeapTide) Color(0xFFFCD34D) else Color(0xFF6EE7B7)
               )
 
@@ -180,7 +180,7 @@ fun RealisticMoonPhaseCard(
                   isNeapTide -> "Güneş ve Ay dik açıda. Gelgit aralığı en dar seviyededir."
                   else -> "Düzenli gelgit döngüsü etkindir."
                 },
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, lineHeight = 13.sp),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp, lineHeight = 11.5.sp),
                 color = Color.White.copy(alpha = 0.85f),
                 softWrap = true
               )

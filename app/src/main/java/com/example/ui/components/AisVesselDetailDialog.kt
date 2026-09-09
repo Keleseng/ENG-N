@@ -42,7 +42,7 @@ fun AisVesselDetailDialog(
   modifier: Modifier = Modifier
 ) {
   val context = LocalContext.current
-  var selectedTab by remember { mutableStateOf(0) } // 0: AIS Özellikleri & Telemetri, 1: MarineTraffic Canlı Sayfa
+  var selectedTab by remember { mutableStateOf(0) } // 0: AIS Özellikleri & Telemetri, 1: AIS Canlı Harita Sayfası
 
   val cardBg = getMarineCardBg(isDarkMode)
   val cardBorder = getMarineCardBorder(isDarkMode)
@@ -113,7 +113,7 @@ fun AisVesselDetailDialog(
           }
         }
 
-        // 2. Tab Seçici (AIS Telemetrisi / MarineTraffic Canlı Web)
+        // 2. Tab Seçici (AIS Telemetrisi / AIS Canlı Harita)
         Row(
           modifier = Modifier
             .fillMaxWidth()
@@ -148,7 +148,7 @@ fun AisVesselDetailDialog(
           ) {
             Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(14.dp))
             Spacer(modifier = Modifier.width(4.dp))
-            Text("VesselFinder Harita", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+            Text("MarineTraffic Harita", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
           }
         }
 
@@ -245,8 +245,8 @@ fun AisVesselDetailDialog(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
               ) {
                 AisStatBox(
-                  label = "ENLEM & BOYLAM (DENİZ GPS)",
-                  value = "${com.example.model.LocationPresets.formatMarineLatitude(aisData.latitude)}\n${com.example.model.LocationPresets.formatMarineLongitude(aisData.longitude)}",
+                  label = "ENLEM & BOYLAM (DENİZ GPS DMS)",
+                  value = "${com.example.model.LocationPresets.formatMarineLatDMS(aisData.latitude)}\n${com.example.model.LocationPresets.formatMarineLonDMS(aisData.longitude)}",
                   icon = Icons.Default.Place,
                   accentColor = if (isDarkMode) Color(0xFF38BDF8) else PrimaryBlue,
                   isDarkMode = isDarkMode,
@@ -291,11 +291,10 @@ fun AisVesselDetailDialog(
                 }
               }
 
-              // VesselFinder Doğrudan Tarayıcı Butonu
+              // MarineTraffic Doğrudan Tarayıcı Butonu
               OutlinedButton(
                 onClick = {
-                  val mmsiClean = aisData.mmsi.trim().ifBlank { "222111447" }
-                  val targetUrl = "https://www.vesselfinder.com/vessels/details/$mmsiClean"
+                  val targetUrl = "https://www.marinetraffic.com/en/ais/home/centerx:${String.format(java.util.Locale.US, "%.4f", aisData.longitude)}/centery:${String.format(java.util.Locale.US, "%.4f", aisData.latitude)}/zoom:14"
                   val intent = Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl))
                   context.startActivity(intent)
                 },
@@ -305,11 +304,11 @@ fun AisVesselDetailDialog(
               ) {
                 Icon(Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("VesselFinder (vesselfinder.com) Sitesinde Aç", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+                Text("MarineTraffic Haritasında Aç", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
               }
             }
           } else {
-            // Canlı Gemi / Harita WebView (VesselFinder)
+            // Canlı Gemi / Harita WebView (MarineTraffic)
             var dialogWebViewRef by remember { mutableStateOf<WebView?>(null) }
             DisposableEffect(Unit) {
               onDispose {
@@ -327,7 +326,7 @@ fun AisVesselDetailDialog(
             AndroidView(
               factory = { ctx ->
                 WebView(ctx).apply {
-                  setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+                  setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null)
                   settings.javaScriptEnabled = true
                   settings.domStorageEnabled = true
                   settings.databaseEnabled = true
@@ -343,6 +342,21 @@ fun AisVesselDetailDialog(
                   settings.userAgentString = "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36"
                   webChromeClient = WebChromeClient()
                   webViewClient = object : WebViewClient() {
+                    override fun onPageFinished(view: WebView?, url: String?) {
+                      super.onPageFinished(view, url)
+                      if (isDarkMode) {
+                        view?.evaluateJavascript(
+                          """
+                          (function() {
+                            var style = document.createElement('style');
+                            style.innerHTML = 'html { filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(85%); background: #121212 !important; } iframe, img, canvas { filter: invert(100%) hue-rotate(180deg) !important; }';
+                            document.head.appendChild(style);
+                          })();
+                          """.trimIndent(),
+                          null
+                        )
+                      }
+                    }
                     override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
                       try {
                         view?.destroy()
@@ -352,8 +366,7 @@ fun AisVesselDetailDialog(
                       return true // Prevents app crash
                     }
                   }
-                  val mmsiClean = aisData.mmsi.trim().ifBlank { "222111447" }
-                  val dialogUrl = "https://www.vesselfinder.com/vessels/details/$mmsiClean"
+                  val dialogUrl = "https://www.marinetraffic.com/en/ais/home/centerx:${String.format(java.util.Locale.US, "%.4f", aisData.longitude)}/centery:${String.format(java.util.Locale.US, "%.4f", aisData.latitude)}/zoom:14"
                   loadUrl(dialogUrl)
                   dialogWebViewRef = this
                 }

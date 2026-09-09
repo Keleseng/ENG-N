@@ -45,8 +45,6 @@ class MainActivity : ComponentActivity() {
     setContent {
       val uiState by viewModel.uiState.collectAsState()
       MyApplicationTheme(darkTheme = uiState.isDarkMode) {
-        var showSplash by rememberSaveable { mutableStateOf(true) }
-
         // Otomatik Konum İzni İsteme & Sürekli Güncelleme Başlatma
         val permissionLauncher = rememberLauncherForActivityResult(
           contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -84,25 +82,19 @@ class MainActivity : ComponentActivity() {
           }
         }
 
-        if (showSplash) {
-          SplashScreen(
-            onSplashFinished = { showSplash = false },
-            modifier = Modifier.fillMaxSize()
-          )
-        } else {
-          MainScreen(
-            viewModel = viewModel,
-            onRequestPermission = {
-              permissionLauncher.launch(
-                arrayOf(
-                  Manifest.permission.ACCESS_FINE_LOCATION,
-                  Manifest.permission.ACCESS_COARSE_LOCATION
-                )
+        // Ana Ekrana Doğrudan Giriş (Açılış logosu ve bekleme kaldırıldı)
+        MainScreen(
+          viewModel = viewModel,
+          onRequestPermission = {
+            permissionLauncher.launch(
+              arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
               )
-            },
-            modifier = Modifier.fillMaxSize()
-          )
-        }
+            )
+          },
+          modifier = Modifier.fillMaxSize()
+        )
       }
     }
   }

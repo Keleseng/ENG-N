@@ -197,6 +197,66 @@ object LocationPresets {
       typicalTideRangeMeters = 0.3,
       description = "Sahil Güvenlik Karadeniz Bölge Komutanlığı Askeri İskelesi ve Karakol Botları",
       timeZoneOffsetHours = 3.0
+    ),
+    PortLocation(
+      id = "bozcaada_limani",
+      name = "Bozcaada Limanı & Askeri Gözetleme (Çanakkale)",
+      country = "Türkiye",
+      category = "Ege Adaları / Ada Limanı",
+      latitude = 39.8333,
+      longitude = 26.0667,
+      defaultChartedDepthMeters = 9.0,
+      typicalTideRangeMeters = 0.4,
+      description = "Kuzey Ege Stratejik Bozcaada Limanı, Sahil Güvenlik ve Ada Barınağı",
+      timeZoneOffsetHours = 3.0
+    ),
+    PortLocation(
+      id = "gokceada_kuzu_limani",
+      name = "Gökçeada Kuzu Limanı (Çanakkale)",
+      country = "Türkiye",
+      category = "Ege Adaları / Ana Ada Limanı",
+      latitude = 40.2333,
+      longitude = 25.9000,
+      defaultChartedDepthMeters = 12.0,
+      typicalTideRangeMeters = 0.4,
+      description = "Ege Denizi Gökçeada Ana Feribot ve Sahil Güvenlik İskelesi",
+      timeZoneOffsetHours = 3.0
+    ),
+    PortLocation(
+      id = "marmara_adasi_limani",
+      name = "Marmara Adası & Saraylar Limanı (Balıkesir)",
+      country = "Türkiye",
+      category = "Marmara Adaları / Ada Limanı",
+      latitude = 40.5833,
+      longitude = 27.5500,
+      defaultChartedDepthMeters = 15.0,
+      typicalTideRangeMeters = 0.4,
+      description = "Marmara Denizi Ada Limanı, Mermer Sevkiyat ve Barınma Mevkii",
+      timeZoneOffsetHours = 3.0
+    ),
+    PortLocation(
+      id = "buyukada_prens_adalari",
+      name = "Büyükada & Prens Adaları (İstanbul)",
+      country = "Türkiye",
+      category = "Marmara / Prens Adaları",
+      latitude = 40.8744,
+      longitude = 29.1286,
+      defaultChartedDepthMeters = 11.0,
+      typicalTideRangeMeters = 0.5,
+      description = "İstanbul Prens Adaları Ana Limanı ve Deniz Ulaşım İskelesi",
+      timeZoneOffsetHours = 3.0
+    ),
+    PortLocation(
+      id = "kekova_adasi_kalekoy",
+      name = "Kekova / Simena Adası & Kaleköy (Antalya)",
+      country = "Türkiye",
+      category = "Akdeniz Adaları / Doğal Liman",
+      latitude = 36.1900,
+      longitude = 29.8600,
+      defaultChartedDepthMeters = 14.0,
+      typicalTideRangeMeters = 0.4,
+      description = "Kekova Batık Şehir, Doğal Korunaklı Ada Limanı ve Barınma Alanı",
+      timeZoneOffsetHours = 3.0
     )
   )
 
@@ -220,6 +280,92 @@ object LocationPresets {
 
   fun formatMarineDdmCoordinates(lat: Double, lon: Double): String {
     return "${formatMarineLatDDM(lat)} ${formatMarineLonDDM(lon)}"
+  }
+
+  /**
+   * Deniz GPS Derece Dakika Saniye (DMS) formatı: örn. 41°00'49"K
+   */
+  fun formatMarineLatDMS(lat: Double, includeSecondsDecimals: Boolean = false): String {
+    val absLat = abs(lat)
+    val deg = absLat.toInt()
+    val minFull = (absLat - deg) * 60.0
+    val min = minFull.toInt()
+    val sec = (minFull - min) * 60.0
+    val dir = if (lat >= 0) "K" else "G"
+    return if (includeSecondsDecimals) {
+      String.format(Locale.US, "%02d°%02d'%04.1f\"%s", deg, min, sec, dir)
+    } else {
+      String.format(Locale.US, "%02d°%02d'%02d\"%s", deg, min, kotlin.math.round(sec).toInt(), dir)
+    }
+  }
+
+  /**
+   * Deniz GPS Derece Dakika Saniye (DMS) formatı: örn. 28°58'33"D
+   */
+  fun formatMarineLonDMS(lon: Double, includeSecondsDecimals: Boolean = false): String {
+    val absLon = abs(lon)
+    val deg = absLon.toInt()
+    val minFull = (absLon - deg) * 60.0
+    val min = minFull.toInt()
+    val sec = (minFull - min) * 60.0
+    val dir = if (lon >= 0) "D" else "B"
+    return if (includeSecondsDecimals) {
+      String.format(Locale.US, "%03d°%02d'%04.1f\"%s", deg, min, sec, dir)
+    } else {
+      String.format(Locale.US, "%03d°%02d'%02d\"%s", deg, min, kotlin.math.round(sec).toInt(), dir)
+    }
+  }
+
+  fun formatMarineDmsCoordinates(lat: Double, lon: Double): String {
+    return "${formatMarineLatDMS(lat)}, ${formatMarineLonDMS(lon)}"
+  }
+
+  /**
+   * DMS (41°00'49"K), DDM (K 41° 00.817') veya ondalık (41.0136) koordinat dizgilerini Double değere ayrıştırır.
+   */
+  fun parseCoordinateOrDecimal(input: String?): Double? {
+    if (input.isNullOrBlank()) return null
+    val clean = input.trim()
+    // 1. DMS Regex: 41°00'49"K veya 41° 00' 49" K veya 41 00 49 K
+    val dmsRegex = Regex("""(\d+)[°\s]+(\d+)['\s]+([\d.]+)["]?\s*([KkGgDdBbNnSsEeWw])?""")
+    val match = dmsRegex.find(clean)
+    if (match != null && (clean.contains("\"") || (clean.contains("'") && clean.contains("°") && match.groupValues[3].isNotBlank()))) {
+      val deg = match.groupValues[1].toDoubleOrNull() ?: 0.0
+      val min = match.groupValues[2].toDoubleOrNull() ?: 0.0
+      val sec = match.groupValues[3].toDoubleOrNull() ?: 0.0
+      val dir = match.groupValues.getOrNull(4)?.uppercase() ?: ""
+      var decimal = deg + (min / 60.0) + (sec / 3600.0)
+      if (dir == "G" || dir == "S" || dir == "B" || dir == "W" || clean.startsWith("-")) {
+        decimal = -abs(decimal)
+      }
+      return decimal
+    }
+    // 2. DDM Regex: 41° 00.817' K
+    val ddmRegex = Regex("""([KkGgDdBbNnSsEeWw])?\s*(\d+)[°\s]+([\d.]+)[']?\s*([KkGgDdBbNnSsEeWw])?""")
+    val ddmMatch = ddmRegex.find(clean)
+    if (ddmMatch != null && clean.contains("'") && !clean.contains("\"")) {
+      val dir1 = ddmMatch.groupValues[1].uppercase()
+      val deg = ddmMatch.groupValues[2].toDoubleOrNull() ?: 0.0
+      val min = ddmMatch.groupValues[3].toDoubleOrNull() ?: 0.0
+      val dir2 = ddmMatch.groupValues[4].uppercase()
+      val dir = if (dir1.isNotBlank()) dir1 else dir2
+      var decimal = deg + (min / 60.0)
+      if (dir == "G" || dir == "S" || dir == "B" || dir == "W" || clean.startsWith("-")) {
+        decimal = -abs(decimal)
+      }
+      return decimal
+    }
+    // 3. Standart ondalık: 41.01361 veya 41,01361 (sonda K/G/D/B veya N/S/E/W olabilir)
+    val plainWithDir = Regex("""^([+-]?[\d.]+)\s*([KkGgDdBbNnSsEeWw])?$""").find(clean.replace(',', '.'))
+    if (plainWithDir != null) {
+      var num = plainWithDir.groupValues[1].toDoubleOrNull() ?: return null
+      val dir = plainWithDir.groupValues.getOrNull(2)?.uppercase() ?: ""
+      if (dir == "G" || dir == "S" || dir == "B" || dir == "W") {
+        num = -abs(num)
+      }
+      return num
+    }
+    return clean.replace(',', '.').toDoubleOrNull()
   }
 
   fun formatMarineLatitude(lat: Double): String {

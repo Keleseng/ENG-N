@@ -31,8 +31,8 @@ enum class MarineMapLayer(
     description = "Uluslararası Açık Deniz Seyir Haritası, Fenerler, Şamandıralar ve Seyir Hatları"
   ),
   MARINE_TRAFFIC_LIVE(
-    displayName = "MarineTraffic Canlı Harita & AIS",
-    shortBadge = "MarineTraffic Canlı",
+    displayName = "Canlı Harita & AIS Trafiği",
+    shortBadge = "AIS Canlı",
     description = "Gerçek Zamanlı Küresel Gemi Trafiği, Canlı Pozisyonlar ve Seyir Rotaları"
   ),
   NAVIONICS_CMAP(
