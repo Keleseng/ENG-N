@@ -14,7 +14,9 @@ import com.example.engine.TideCalculatorEngine
 import com.example.location.GpsFix
 import com.example.location.GpsLocationProvider
 import com.example.model.*
+import com.example.sensor.MarineAttitudeProvider
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -70,6 +72,7 @@ data class TideUiState(
   val mobEvent: MobEvent = MobEvent(),
   val anchorEvent: AnchorDropEvent = AnchorDropEvent(),
   val anchorShackleStandard: ShackleLengthStandard = ShackleLengthStandard.STANDARD_27_5,
+  val isAnchorChainAuto: Boolean = true,
   val anchorChainShacklesStr: String = "5.0",
   val anchorChainScopeStr: String = "137.5",
   val anchorDepthStr: String = "40.0",
@@ -80,6 +83,7 @@ data class TideUiState(
   val anchorLoaStr: String = "120.0",
   val anchorSafetyMarginStr: String = "0.0",
   val anchorBottomType: AnchorBottomType = AnchorBottomType.MUD_SAND,
+  val anchorWeatherScenario: AnchorWeatherScenario = AnchorWeatherScenario.LIVE,
   val anchorCalculationResult: AnchorCalculationResult = calculateInitialAnchorResult(),
   val marineWeather: MarineWeather = calculateInitialWeather(),
   val speedCalculationResult: SpeedCalculationResult = calculateInitialSpeedResult(),
@@ -99,7 +103,18 @@ data class TideUiState(
   val verifiedMarineDepth: com.example.engine.MarineDepthResult? = null,
   val isDepthLoading: Boolean = false,
   val selectedSimpleEtaDestination: com.example.model.SimpleDestination? = null,
-  val simpleEtaResult: com.example.model.SimpleEtaResult? = null
+  val simpleEtaResult: com.example.model.SimpleEtaResult? = null,
+  val etaSummaryReceipt: com.example.model.EtaSummaryReceipt? = null,
+  val mapFocusCoordinate: com.example.model.Coordinate? = null,
+  val txtLogHistory: List<com.example.engine.TxtLogRecord> = emptyList(),
+  val nextAutoLogTimeStr: String = "",
+  val selectedTxtLogForView: com.example.engine.TxtLogRecord? = null,
+  val txtLogMessage: String? = null,
+  val isAisRadarOpen: Boolean = false,
+  val surroundingAisTargets: List<com.example.model.RadarAisTarget> = emptyList(),
+  val selectedRadarTarget: com.example.model.RadarAisTarget? = null,
+  val radarRangeNm: Double = 6.0,
+  val isRadarHeadUp: Boolean = true
 )
 
 private fun calculateInitialAnchorResult(): AnchorCalculationResult {
@@ -159,12 +174,16 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
   private val historyRepository = CalculationRepository(database.calculationDao())
 
   private val weatherProvider = MarineWeatherProvider()
+  private val attitudeProvider = MarineAttitudeProvider(application.applicationContext)
   private var continuousTrackingJob: Job? = null
+  private var autoTxtLogJob: Job? = null
 
   init {
     syncRealMoonData()
     fetchDepthFromMmsiVessel()
     observeCalculationHistory()
+    startAttitudeMonitoring()
+    startAuto30MinTxtLogging()
   }
 
   private fun observeCalculationHistory() {
@@ -209,36 +228,7 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
       _uiState.update { it.copy(isDepthLoading = true) }
       try {
         val aisData = com.example.engine.AisTrackingEngine.fetchAisDataByMmsi(mmsiToTrack)
-        val shipLat = aisData.latitude
-        val shipLon = aisData.longitude
-        val latFormatted = com.example.model.LocationPresets.formatMarineLatDMS(shipLat)
-        val lonFormatted = com.example.model.LocationPresets.formatMarineLonDMS(shipLon)
-
-        val depthResult = com.example.engine.MarineDepthProvider.fetchMarineDepth(shipLat, shipLon)
-
-        _uiState.update { current ->
-          val updated = current.copy(
-            vesselName = aisData.name.ifBlank { current.vesselName },
-            mmsiStr = aisData.mmsi,
-            latStr = latFormatted,
-            lonStr = lonFormatted,
-            isCustomPort = true,
-            verifiedMarineDepth = depthResult,
-            chartedDepthStr = String.format(Locale.US, "%.1f", depthResult.depthMeters),
-            isDepthLoading = false,
-            activeAisVesselData = aisData,
-            activeMarineTrafficUrl = aisData.marineTrafficUrl
-          )
-          val speedRes = computeSpeedCalculation(updated)
-          val anchorRes = computeAnchorCalculation(updated)
-          updated.copy(
-            analysis = computeAnalysis(updated),
-            speedCalculationResult = speedRes,
-            anchorCalculationResult = anchorRes
-          )
-        }
-        val weather = weatherProvider.fetchMarineWeather(shipLat, shipLon)
-        _uiState.update { it.copy(marineWeather = weather) }
+        applyAisVesselData(aisData)
       } catch (e: Exception) {
         _uiState.update { it.copy(isDepthLoading = false) }
       }
@@ -246,22 +236,27 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
   }
 
   fun fetchVerifiedDepth(lat: Double? = null, lon: Double? = null) {
-    if (lat == null && lon == null && _uiState.value.mmsiStr.isNotBlank()) {
-      fetchDepthFromMmsiVessel()
-      return
-    }
     viewModelScope.launch {
-      val targetLat = lat ?: com.example.model.LocationPresets.parseCoordinateOrDecimal(_uiState.value.latStr) ?: _uiState.value.selectedPort.latitude
-      val targetLon = lon ?: com.example.model.LocationPresets.parseCoordinateOrDecimal(_uiState.value.lonStr) ?: _uiState.value.selectedPort.longitude
+      val targetLat = lat
+        ?: com.example.model.LocationPresets.parseCoordinateOrDecimal(_uiState.value.latStr)
+        ?: _uiState.value.activeAisVesselData?.latitude
+        ?: _uiState.value.selectedPort.latitude
+      val targetLon = lon
+        ?: com.example.model.LocationPresets.parseCoordinateOrDecimal(_uiState.value.lonStr)
+        ?: _uiState.value.activeAisVesselData?.longitude
+        ?: _uiState.value.selectedPort.longitude
+
       _uiState.update { it.copy(isDepthLoading = true) }
       try {
         val result = com.example.engine.MarineDepthProvider.fetchMarineDepth(targetLat, targetLon)
+        val depthFormatted = String.format(Locale.US, "%.1f", result.depthMeters)
         _uiState.update { current ->
           val updated = current.copy(
             verifiedMarineDepth = result,
             isDepthLoading = false,
-            // Derinlik bilgisini aynı zamanda seyir derinliği alanına da senkronize edebiliriz
-            chartedDepthStr = String.format(Locale.US, "%.1f", result.depthMeters)
+            // Seyir haritası derinliği ve demirleme su derinliğini AIS/GPS koordinatının derinliğine senkronize et
+            chartedDepthStr = depthFormatted,
+            anchorDepthStr = depthFormatted
           )
           val speedRes = computeSpeedCalculation(updated)
           val anchorRes = computeAnchorCalculation(updated)
@@ -272,7 +267,23 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
           )
         }
       } catch (e: Exception) {
-        _uiState.update { it.copy(isDepthLoading = false) }
+        val fallback = com.example.engine.MarineDepthProvider.calculateRegionalDepthFallback(targetLat, targetLon)
+        val fallbackDepthFormatted = String.format(Locale.US, "%.1f", fallback.depthMeters)
+        _uiState.update { current ->
+          val updated = current.copy(
+            verifiedMarineDepth = fallback,
+            isDepthLoading = false,
+            chartedDepthStr = fallbackDepthFormatted,
+            anchorDepthStr = fallbackDepthFormatted
+          )
+          val speedRes = computeSpeedCalculation(updated)
+          val anchorRes = computeAnchorCalculation(updated)
+          updated.copy(
+            analysis = computeAnalysis(updated),
+            speedCalculationResult = speedRes,
+            anchorCalculationResult = anchorRes
+          )
+        }
       }
     }
   }
@@ -286,7 +297,8 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
       _uiState.update { current ->
         val updated = current.copy(marineWeather = weather)
         val speedRes = computeSpeedCalculation(updated)
-        updated.copy(speedCalculationResult = speedRes)
+        val anchorRes = computeAnchorCalculation(updated)
+        updated.copy(speedCalculationResult = speedRes, anchorCalculationResult = anchorRes)
       }
     }
   }
@@ -459,8 +471,32 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
     }
   }
 
+  private fun startAttitudeMonitoring() {
+    viewModelScope.launch {
+      attitudeProvider.startAttitudeUpdates(
+        getHeadingDegrees = {
+          _uiState.value.lastGpsFix?.bearingDegrees ?: (_uiState.value.headingDegreesStr.toFloatOrNull() ?: 270f)
+        }
+      ).collect { att ->
+        _uiState.update { it.copy(marineAttitude = att) }
+      }
+    }
+  }
+
   fun updateMarineAttitude(attitude: MarineAttitude) {
     _uiState.update { it.copy(marineAttitude = attitude) }
+  }
+
+  fun tareAttitude() {
+    attitudeProvider.tare()
+  }
+
+  fun resetAttitudeTare() {
+    attitudeProvider.resetTare()
+  }
+
+  fun toggleAttitudeHold() {
+    attitudeProvider.toggleHold()
   }
 
   fun updateVesselName(value: String) {
@@ -500,14 +536,50 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
   fun setSimpleEtaDestination(dest: com.example.model.SimpleDestination?) {
     _uiState.update { current ->
       val updated = current.copy(selectedSimpleEtaDestination = dest)
-      updated.copy(simpleEtaResult = computeSimpleEta(updated))
+      val simpleEta = computeSimpleEta(updated)
+      val receipt = if (dest != null) {
+        val lat = current.lastGpsFix?.latitude ?: com.example.model.LocationPresets.parseCoordinateOrDecimal(current.latStr) ?: 40.8360
+        val lon = current.lastGpsFix?.longitude ?: com.example.model.LocationPresets.parseCoordinateOrDecimal(current.lonStr) ?: 29.3010
+        val speed = current.lastGpsFix?.speedKnots?.takeIf { it > 0.5 }
+          ?: current.activeAisVesselData?.sogKnots?.takeIf { it > 0.5 }
+          ?: current.speedStr.toDoubleOrNull()?.takeIf { it > 0.5 }
+          ?: 12.0
+        com.example.model.computeEtaSummary(lat, lon, speed, com.example.model.Coordinate(dest.lat, dest.lon), dest.name)
+      } else null
+      updated.copy(
+        simpleEtaResult = simpleEta,
+        etaSummaryReceipt = receipt
+      )
     }
+  }
+
+  fun calculateAndSetEta(coord: com.example.model.Coordinate, targetName: String? = null) {
+    _uiState.update { current ->
+      val lat = current.lastGpsFix?.latitude ?: com.example.model.LocationPresets.parseCoordinateOrDecimal(current.latStr) ?: 40.8360
+      val lon = current.lastGpsFix?.longitude ?: com.example.model.LocationPresets.parseCoordinateOrDecimal(current.lonStr) ?: 29.3010
+      val speed = current.lastGpsFix?.speedKnots?.takeIf { it > 0.5 }
+        ?: current.activeAisVesselData?.sogKnots?.takeIf { it > 0.5 }
+        ?: current.speedStr.toDoubleOrNull()?.takeIf { it > 0.5 }
+        ?: 12.0
+      val receipt = com.example.model.computeEtaSummary(lat, lon, speed, coord, targetName)
+      val dest = com.example.model.SimpleDestination(targetName ?: "Varış Mevkii", coord.latitude, coord.longitude)
+      val simpleEta = com.example.model.calculateSimpleEta(lat, lon, speed, dest)
+      current.copy(
+        selectedSimpleEtaDestination = dest,
+        simpleEtaResult = simpleEta,
+        etaSummaryReceipt = receipt
+      )
+    }
+  }
+
+  fun setMapFocusCoordinate(coord: com.example.model.Coordinate?) {
+    _uiState.update { it.copy(mapFocusCoordinate = coord) }
   }
 
   private fun computeSimpleEta(state: TideUiState): com.example.model.SimpleEtaResult? {
     val dest = state.selectedSimpleEtaDestination ?: return null
-    val lat = com.example.model.LocationPresets.parseCoordinateOrDecimal(state.latStr) ?: return null
-    val lon = com.example.model.LocationPresets.parseCoordinateOrDecimal(state.lonStr) ?: return null
+    val lat = state.lastGpsFix?.latitude ?: com.example.model.LocationPresets.parseCoordinateOrDecimal(state.latStr) ?: 40.8360
+    val lon = state.lastGpsFix?.longitude ?: com.example.model.LocationPresets.parseCoordinateOrDecimal(state.lonStr) ?: 29.3010
     val speed = state.lastGpsFix?.speedKnots ?: state.activeAisVesselData?.sogKnots ?: state.speedStr.toDoubleOrNull() ?: 0.0
     return com.example.model.calculateSimpleEta(lat, lon, speed, dest)
   }
@@ -518,6 +590,73 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
 
   fun dismissAisMessages() {
     _uiState.update { it.copy(aisErrorMessage = null, aisSuccessMessage = null) }
+  }
+
+  fun getEffectiveShipCoordinates(): Pair<Double, Double> {
+    val state = _uiState.value
+    val lat = state.lastGpsFix?.latitude
+      ?: state.activeAisVesselData?.latitude
+      ?: com.example.model.LocationPresets.parseCoordinateOrDecimal(state.latStr)
+      ?: state.selectedPort.latitude
+    val lon = state.lastGpsFix?.longitude
+      ?: state.activeAisVesselData?.longitude
+      ?: com.example.model.LocationPresets.parseCoordinateOrDecimal(state.lonStr)
+      ?: state.selectedPort.longitude
+    return Pair(lat, lon)
+  }
+
+  fun openAisRadar() {
+    val state = _uiState.value
+    val (lat, lon) = getEffectiveShipCoordinates()
+    val ownSpeed = state.lastGpsFix?.speedKnots?.takeIf { it > 0 } ?: state.activeAisVesselData?.sogKnots ?: 0.0
+    val ownCog = state.lastGpsFix?.bearingDegrees?.toDouble()?.takeIf { it > 0 } ?: state.activeAisVesselData?.cogDegrees ?: 270.0
+    val targets = com.example.engine.SurroundingAisRadarEngine.generateSurroundingVessels(lat, lon, ownSpeed, ownCog)
+    _uiState.update {
+      it.copy(
+        isAisRadarOpen = true,
+        surroundingAisTargets = targets,
+        selectedRadarTarget = targets.firstOrNull { t -> t.isHazardous } ?: targets.firstOrNull()
+      )
+    }
+  }
+
+  fun closeAisRadar() {
+    _uiState.update { it.copy(isAisRadarOpen = false, selectedRadarTarget = null) }
+  }
+
+  fun refreshSurroundingAisTargets() {
+    val state = _uiState.value
+    val (lat, lon) = getEffectiveShipCoordinates()
+    val ownSpeed = state.lastGpsFix?.speedKnots?.takeIf { it > 0 } ?: state.activeAisVesselData?.sogKnots ?: 0.0
+    val ownCog = state.lastGpsFix?.bearingDegrees?.toDouble()?.takeIf { it > 0 } ?: state.activeAisVesselData?.cogDegrees ?: 270.0
+    val targets = com.example.engine.SurroundingAisRadarEngine.generateSurroundingVessels(lat, lon, ownSpeed, ownCog)
+    _uiState.update {
+      it.copy(
+        surroundingAisTargets = targets,
+        selectedRadarTarget = targets.find { t -> t.id == it.selectedRadarTarget?.id } ?: targets.firstOrNull()
+      )
+    }
+  }
+
+  fun updateSurroundingAisTargetsDirect(targets: List<com.example.model.RadarAisTarget>) {
+    _uiState.update {
+      it.copy(
+        surroundingAisTargets = targets,
+        selectedRadarTarget = targets.find { t -> t.id == it.selectedRadarTarget?.id } ?: it.selectedRadarTarget
+      )
+    }
+  }
+
+  fun selectRadarTarget(target: com.example.model.RadarAisTarget?) {
+    _uiState.update { it.copy(selectedRadarTarget = target) }
+  }
+
+  fun setRadarRange(rangeNm: Double) {
+    _uiState.update { it.copy(radarRangeNm = rangeNm) }
+  }
+
+  fun toggleRadarOrientation() {
+    _uiState.update { it.copy(isRadarHeadUp = !it.isRadarHeadUp) }
   }
 
   /**
@@ -628,6 +767,7 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
 
   /**
    * Gelen AIS verilerini ve telemetriyi form girdilerine, haritaya ve hesaplamalara uygular.
+   * Gemi mevkiinin GPS koordinatlarına (enlem/boylam) ait deniz derinliğini anında getirir.
    */
   fun applyAisVesselData(data: AisVesselData) {
     val latFormatted = com.example.model.LocationPresets.formatMarineLatDMS(data.latitude)
@@ -636,6 +776,10 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
     val headingFormatted = String.format(Locale.US, "%03d", data.headingDegrees)
     val bridgeToHawse = String.format(Locale.US, "%.1f", (data.loaMeters * 0.25).coerceAtLeast(10.0))
     val bridgeToStern = String.format(Locale.US, "%.1f", (data.loaMeters * 0.75).coerceAtLeast(20.0))
+
+    // AIS gemi mevkisinin GPS koordinatlarına göre anlık batimetri / derinlik verisi
+    val initialDepthResult = com.example.engine.MarineDepthProvider.calculateRegionalDepthFallback(data.latitude, data.longitude)
+    val initialDepthFormatted = String.format(Locale.US, "%.1f", initialDepthResult.depthMeters)
 
     _uiState.update { current ->
       val updated = current.copy(
@@ -656,7 +800,12 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
         headingDegreesStr = headingFormatted,
         isCustomPort = true,
         activeMarineTrafficUrl = data.marineTrafficUrl,
-        activeAisVesselData = data
+        activeAisVesselData = data,
+        activeLocationSource = LocationSource.AIS,
+        isDepthLoading = true,
+        chartedDepthStr = initialDepthFormatted,
+        anchorDepthStr = initialDepthFormatted,
+        verifiedMarineDepth = initialDepthResult
       )
       val speedRes = computeSpeedCalculation(updated)
       val anchorRes = computeAnchorCalculation(updated)
@@ -688,7 +837,6 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
           anchorLoaStr = shipData.loaMeters.toString(),
           anchorBridgeToHawseStr = bridgeToHawse,
           anchorBridgeToSternStr = bridgeToStern,
-          anchorDepthStr = "40.0",
           anchorChainShacklesStr = "5.0",
           anchorChainScopeStr = "137.5",
           anchorEvent = if (current.anchorEvent.isAnchored) {
@@ -730,6 +878,10 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
     val aisVessel = _uiState.value.activeAisVesselData ?: com.example.engine.AisTrackingEngine.getNb252ShipData()
     val latFormatted = com.example.model.LocationPresets.formatMarineLatDMS(aisVessel.latitude)
     val lonFormatted = com.example.model.LocationPresets.formatMarineLonDMS(aisVessel.longitude)
+
+    val fallbackDepth = com.example.engine.MarineDepthProvider.calculateRegionalDepthFallback(aisVessel.latitude, aisVessel.longitude)
+    val depthFormatted = String.format(Locale.US, "%.1f", fallbackDepth.depthMeters)
+
     _uiState.update { current ->
       val updated = current.copy(
         latStr = latFormatted,
@@ -747,14 +899,20 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
         isCustomPort = true,
         activeAisVesselData = aisVessel,
         activeLocationSource = LocationSource.AIS,
-        aisSuccessMessage = "⚓ AIS Verileri (${aisVessel.name}) ve Tüm Telemetri Aktarıldı! (AIS Aktif)"
+        isDepthLoading = true,
+        chartedDepthStr = depthFormatted,
+        anchorDepthStr = depthFormatted,
+        verifiedMarineDepth = fallbackDepth,
+        aisSuccessMessage = "⚓ AIS Verileri (${aisVessel.name}) ve Mevkii Derinlik Bilgisi (${depthFormatted}m) Aktarıldı! (AIS Aktif)"
       )
       val speedRes = computeSpeedCalculation(updated)
       val simpleEta = computeSimpleEta(updated)
+      val anchorRes = computeAnchorCalculation(updated)
       updated.copy(
         analysis = computeAnalysis(updated),
         speedCalculationResult = speedRes,
-        simpleEtaResult = simpleEta
+        simpleEtaResult = simpleEta,
+        anchorCalculationResult = anchorRes
       )
     }
     fetchVerifiedDepth(aisVessel.latitude, aisVessel.longitude)
@@ -968,6 +1126,14 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
     }
   }
 
+  fun setAnchorChainAuto(isAuto: Boolean) {
+    _uiState.update { current ->
+      val updated = current.copy(isAnchorChainAuto = isAuto)
+      val (finalState, _) = syncAndComputeAnchorCalculation(updated)
+      finalState
+    }
+  }
+
   fun updateAnchorCalculation(
     chainScope: String? = null,
     chainShackles: String? = null,
@@ -979,9 +1145,17 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
     bridgeToStern: String? = null,
     loa: String? = null,
     safetyMargin: String? = null,
-    bottomType: AnchorBottomType? = null
+    bottomType: AnchorBottomType? = null,
+    isAutoChain: Boolean? = null
   ) {
     _uiState.update { current ->
+      val isUserExplicitlyEnteringChain = (chainScope != null || chainShackles != null)
+      val newIsAutoChain = when {
+        isAutoChain != null -> isAutoChain
+        isUserExplicitlyEnteringChain -> false
+        else -> current.isAnchorChainAuto
+      }
+
       val activeStandard = shackleStandard ?: current.anchorShackleStandard
       val metersPerShackle = activeStandard.metersPerShackle
 
@@ -997,7 +1171,7 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
           val shStr = if (m != null) String.format(Locale.US, "%.2f", m / metersPerShackle) else current.anchorChainShacklesStr
           Pair(chainScope, shStr)
         }
-        shackleStandard != null -> {
+        shackleStandard != null && !newIsAutoChain -> {
           // Standart değiştiğinde mevcut kilit sayısına göre metreyi yeniden hesapla
           val sh = current.anchorChainShacklesStr.toDoubleOrNull() ?: 5.0
           val mStr = String.format(Locale.US, "%.1f", sh * metersPerShackle)
@@ -1006,26 +1180,63 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
         else -> Pair(current.anchorChainScopeStr, current.anchorChainShacklesStr)
       }
 
+      var newBridgeToHawseStr = bridgeToHawse ?: current.anchorBridgeToHawseStr
+      var newBridgeToSternStr = bridgeToStern ?: current.anchorBridgeToSternStr
+      var newLoaStr = loa ?: current.anchorLoaStr
+
+      if (bridgeToHawse != null || bridgeToStern != null) {
+        val bh = newBridgeToHawseStr.toDoubleOrNull() ?: 0.0
+        val bs = newBridgeToSternStr.toDoubleOrNull() ?: 0.0
+        newLoaStr = String.format(Locale.US, "%.1f", bh + bs)
+      } else if (loa != null) {
+        val l = newLoaStr.toDoubleOrNull() ?: 0.0
+        val bh = newBridgeToHawseStr.toDoubleOrNull() ?: 35.0
+        if (l >= bh) {
+            newBridgeToSternStr = String.format(Locale.US, "%.1f", l - bh)
+        } else {
+            // LOA is less than Bridge to Hawse, so adjust Bridge to Hawse and make Stern 0
+            newBridgeToHawseStr = String.format(Locale.US, "%.1f", l)
+            newBridgeToSternStr = "0.0"
+        }
+      }
+
       val updated = current.copy(
+        isAnchorChainAuto = newIsAutoChain,
         anchorShackleStandard = activeStandard,
         anchorChainShacklesStr = newShacklesStr,
         anchorChainScopeStr = newMetersStr,
         anchorDepthStr = depth ?: current.anchorDepthStr,
         anchorCustomHorizontalDistStr = customHorizontal ?: current.anchorCustomHorizontalDistStr,
         isAnchorAutoHorizontal = isAutoHorizontal ?: current.isAnchorAutoHorizontal,
-        anchorBridgeToHawseStr = bridgeToHawse ?: current.anchorBridgeToHawseStr,
-        anchorBridgeToSternStr = bridgeToStern ?: current.anchorBridgeToSternStr,
-        anchorLoaStr = loa ?: current.anchorLoaStr,
+        anchorBridgeToHawseStr = newBridgeToHawseStr,
+        anchorBridgeToSternStr = newBridgeToSternStr,
+        anchorLoaStr = newLoaStr,
         anchorSafetyMarginStr = safetyMargin ?: current.anchorSafetyMarginStr,
         anchorBottomType = bottomType ?: current.anchorBottomType
       )
-      val anchorRes = computeAnchorCalculation(updated)
-      updated.copy(anchorCalculationResult = anchorRes)
+      val (finalState, _) = syncAndComputeAnchorCalculation(updated)
+      finalState
     }
   }
 
   fun setAnchorShackleStandard(standard: ShackleLengthStandard) {
     updateAnchorCalculation(shackleStandard = standard)
+  }
+
+  fun setAnchorBottomType(bottomType: AnchorBottomType) {
+    updateAnchorCalculation(bottomType = bottomType)
+  }
+
+  fun applySeabedLocation(location: com.example.model.MarineSeabedLocation) {
+    updateAnchorCalculation(
+      bottomType = location.anchorBottomType,
+      depth = String.format(Locale.US, "%.1f", location.typicalDepthMeters)
+    )
+    _uiState.update {
+      it.copy(
+        gpsSuccessMessage = "⚓ ${location.nameTr} (${location.chartSymbol} - ${location.seabedNameTr}) Dip Tabiatı ve Derinliği (${location.typicalDepthMeters}m) Uygulandı!"
+      )
+    }
   }
 
   fun setAnchorChainShackles(shacklesStr: String) {
@@ -1035,6 +1246,18 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
   fun setAnchorChainScopeByShackles(shackles: Double) {
     val formattedShackles = String.format(Locale.US, "%.1f", shackles)
     updateAnchorCalculation(chainShackles = formattedShackles)
+  }
+
+  fun setAnchorWeatherScenario(scenario: AnchorWeatherScenario) {
+    _uiState.update { current ->
+      val updated = current.copy(anchorWeatherScenario = scenario)
+      val (finalState, _) = syncAndComputeAnchorCalculation(updated)
+      finalState
+    }
+  }
+
+  fun applyRecommendedChainScope() {
+    setAnchorChainAuto(true)
   }
 
   fun loadTextbookExample1() {
@@ -1208,6 +1431,65 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
     _uiState.update { it.copy(saveSuccessMessage = null) }
   }
 
+  private fun syncAndComputeAnchorCalculation(state: TideUiState): Pair<TideUiState, AnchorCalculationResult> {
+    var currentState = state
+    val metersPerShackle = currentState.anchorShackleStandard.metersPerShackle
+
+    if (currentState.isAnchorChainAuto) {
+      val b = currentState.anchorDepthStr.toDoubleOrNull() ?: (currentState.chartedDepthStr.toDoubleOrNull() ?: 40.0)
+      val windKts = when (currentState.anchorWeatherScenario) {
+        AnchorWeatherScenario.LIVE -> currentState.marineWeather.windSpeedKnots
+        AnchorWeatherScenario.CALM -> 10.0
+        AnchorWeatherScenario.MODERATE -> 20.0
+        AnchorWeatherScenario.ROUGH -> 30.0
+        AnchorWeatherScenario.STORM -> 42.0
+      }
+      val waveMeters = when (currentState.anchorWeatherScenario) {
+        AnchorWeatherScenario.LIVE -> currentState.marineWeather.waveHeightMeters
+        AnchorWeatherScenario.CALM -> 0.4
+        AnchorWeatherScenario.MODERATE -> 1.2
+        AnchorWeatherScenario.ROUGH -> 2.0
+        AnchorWeatherScenario.STORM -> 3.5
+      }
+      val bft = when (currentState.anchorWeatherScenario) {
+        AnchorWeatherScenario.LIVE -> currentState.marineWeather.beaufortScale
+        AnchorWeatherScenario.CALM -> 3
+        AnchorWeatherScenario.MODERATE -> 5
+        AnchorWeatherScenario.ROUGH -> 7
+        AnchorWeatherScenario.STORM -> 9
+      }
+      val seaState = when (currentState.anchorWeatherScenario) {
+        AnchorWeatherScenario.LIVE -> currentState.marineWeather.seaStateDescription
+        AnchorWeatherScenario.CALM -> "Sakin / Hafif Deniz"
+        AnchorWeatherScenario.MODERATE -> "Orta Çalkantılı Deniz"
+        AnchorWeatherScenario.ROUGH -> "Sert Rüzgar / Kaba Deniz"
+        AnchorWeatherScenario.STORM -> "Fırtına / Ağır Deniz"
+      }
+
+      val recommended = com.example.engine.AnchorCalculationEngine.calculateRecommendedChainScope(
+        depthMeters = b,
+        currentChainMeters = currentState.anchorChainScopeStr.toDoubleOrNull() ?: 137.5,
+        metersPerShackle = metersPerShackle,
+        bottomType = currentState.anchorBottomType,
+        windSpeedKnots = windKts,
+        waveHeightMeters = waveMeters,
+        beaufortScale = bft,
+        seaStateDescription = seaState
+      )
+
+      val autoMetersStr = String.format(Locale.US, "%.1f", recommended.recommendedMeters)
+      val autoShacklesStr = String.format(Locale.US, "%.1f", recommended.recommendedShackles)
+
+      currentState = currentState.copy(
+        anchorChainScopeStr = autoMetersStr,
+        anchorChainShacklesStr = autoShacklesStr
+      )
+    }
+
+    val res = computeAnchorCalculation(currentState)
+    return Pair(currentState.copy(anchorCalculationResult = res), res)
+  }
+
   private fun computeAnchorCalculation(state: TideUiState): AnchorCalculationResult {
     val a = state.anchorChainScopeStr.toDoubleOrNull() ?: 137.5
     val b = state.anchorDepthStr.toDoubleOrNull() ?: (state.chartedDepthStr.toDoubleOrNull() ?: 40.0)
@@ -1216,6 +1498,35 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
     val distStern = state.anchorBridgeToSternStr.toDoubleOrNull() ?: 85.0
     val loaVal = state.anchorLoaStr.toDoubleOrNull() ?: (state.loaStr.toDoubleOrNull() ?: 120.0)
     val safetyVal = state.anchorSafetyMarginStr.toDoubleOrNull() ?: 0.0
+
+    val windKts = when (state.anchorWeatherScenario) {
+      AnchorWeatherScenario.LIVE -> state.marineWeather.windSpeedKnots
+      AnchorWeatherScenario.CALM -> 10.0
+      AnchorWeatherScenario.MODERATE -> 20.0
+      AnchorWeatherScenario.ROUGH -> 30.0
+      AnchorWeatherScenario.STORM -> 42.0
+    }
+    val waveMeters = when (state.anchorWeatherScenario) {
+      AnchorWeatherScenario.LIVE -> state.marineWeather.waveHeightMeters
+      AnchorWeatherScenario.CALM -> 0.4
+      AnchorWeatherScenario.MODERATE -> 1.2
+      AnchorWeatherScenario.ROUGH -> 2.0
+      AnchorWeatherScenario.STORM -> 3.5
+    }
+    val bft = when (state.anchorWeatherScenario) {
+      AnchorWeatherScenario.LIVE -> state.marineWeather.beaufortScale
+      AnchorWeatherScenario.CALM -> 3
+      AnchorWeatherScenario.MODERATE -> 5
+      AnchorWeatherScenario.ROUGH -> 7
+      AnchorWeatherScenario.STORM -> 9
+    }
+    val seaState = when (state.anchorWeatherScenario) {
+      AnchorWeatherScenario.LIVE -> state.marineWeather.seaStateDescription
+      AnchorWeatherScenario.CALM -> "Sakin / Hafif Deniz"
+      AnchorWeatherScenario.MODERATE -> "Orta Çalkantılı Deniz"
+      AnchorWeatherScenario.ROUGH -> "Sert Rüzgar / Kaba Deniz"
+      AnchorWeatherScenario.STORM -> "Fırtına / Ağır Deniz"
+    }
 
     val params = AnchorCalculationParams(
       chainScopeMeters = a,
@@ -1227,14 +1538,20 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
       distBridgeToSternMeters = distStern,
       loaMeters = loaVal,
       safetyMarginMeters = safetyVal,
-      bottomType = state.anchorBottomType
+      bottomType = state.anchorBottomType,
+      windSpeedKnots = windKts,
+      waveHeightMeters = waveMeters,
+      beaufortScale = bft,
+      seaStateDescription = seaState
     )
     return com.example.engine.AnchorCalculationEngine.calculate(params)
   }
 
   private fun computeSpeedCalculation(state: TideUiState): SpeedCalculationResult {
-    val speed = state.speedStr.toDoubleOrNull() ?: state.selectedVessel.defaultSpeedKnots
-    val heading = state.headingDegreesStr.toIntOrNull() ?: 45
+    val dynamicSpeed = state.lastGpsFix?.speedKnots?.takeIf { it > 0 } ?: state.activeAisVesselData?.sogKnots?.takeIf { it > 0 }
+    val speed = dynamicSpeed ?: (state.speedStr.toDoubleOrNull() ?: state.selectedVessel.defaultSpeedKnots)
+    val dynamicHeading = state.lastGpsFix?.bearingDegrees?.toInt()?.takeIf { it > 0 } ?: state.activeAisVesselData?.cogDegrees?.toInt()?.takeIf { it > 0 }
+    val heading = dynamicHeading ?: (state.headingDegreesStr.toIntOrNull() ?: 45)
     val currentSpeed = state.analysis.currentInfo.speedKnots
     val currentDirection = state.analysis.currentInfo.directionDegrees
     val windSpeed = state.marineWeather.windSpeedKnots
@@ -1259,8 +1576,10 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
     val lon = com.example.model.LocationPresets.parseCoordinateOrDecimal(state.lonStr) ?: state.selectedPort.longitude
     val chartedDepth = state.chartedDepthStr.toDoubleOrNull() ?: state.selectedPort.defaultChartedDepthMeters
     val ukc = state.ukcStr.toDoubleOrNull() ?: state.selectedVessel.minUkcMeters
-    val speed = state.speedStr.toDoubleOrNull() ?: state.selectedVessel.defaultSpeedKnots
-    val heading = state.headingDegreesStr.toIntOrNull() ?: 45
+    val dynamicSpeed = state.lastGpsFix?.speedKnots?.takeIf { it > 0 } ?: state.activeAisVesselData?.sogKnots?.takeIf { it > 0 }
+    val speed = dynamicSpeed ?: (state.speedStr.toDoubleOrNull() ?: state.selectedVessel.defaultSpeedKnots)
+    val dynamicHeading = state.lastGpsFix?.bearingDegrees?.toInt()?.takeIf { it > 0 } ?: state.activeAisVesselData?.cogDegrees?.toInt()?.takeIf { it > 0 }
+    val heading = dynamicHeading ?: (state.headingDegreesStr.toIntOrNull() ?: 45)
 
     val blockCoeff = state.blockCoefficientStr.toDoubleOrNull() ?: state.selectedVessel.blockCoefficient
 
@@ -1373,6 +1692,121 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
     _uiState.update {
       it.copy(trackHistory = (it.trackHistory + pt).takeLast(500))
     }
+  }
+
+  // ═════════════════════════════════════════════════════════════════
+  // OTOMATİK 30 DAKİKALIK VE MANUEL TXT LOG KAYDI İŞLEMLERİ
+  // ═════════════════════════════════════════════════════════════════
+
+  private fun startAuto30MinTxtLogging() {
+    autoTxtLogJob?.cancel()
+    autoTxtLogJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+      // Disk üzerindeki tüm logları ilk açılışta yükle
+      val logs = com.example.engine.TxtLoggerManager.loadAllLogs(getApplication())
+      _uiState.update { it.copy(txtLogHistory = logs) }
+
+      while (coroutineContext.isActive) {
+        val now = Calendar.getInstance()
+        val min = now.get(Calendar.MINUTE)
+        val sec = now.get(Calendar.SECOND)
+        val ms = now.get(Calendar.MILLISECOND)
+
+        // Bir sonraki log saati :00 veya :30 dakikalarıdır
+        val targetMinute = if (min < 30) 30 else 60
+        val minutesToWait = targetMinute - min - 1
+        val secondsToWait = 60 - sec - 1
+        val millisToWait = 1000 - ms
+
+        val delayMs = (minutesToWait * 60 * 1000L) + (secondsToWait * 1000L) + millisToWait
+
+        val nextCal = Calendar.getInstance().apply {
+          add(Calendar.MILLISECOND, delayMs.toInt())
+        }
+        val sdfNext = SimpleDateFormat("HH:mm", Locale.getDefault())
+        _uiState.update { it.copy(nextAutoLogTimeStr = sdfNext.format(nextCal.time)) }
+
+        kotlinx.coroutines.delay(delayMs)
+
+        // :00 ve :30 saat başı / yarım saatlerde otomatik TXT log kaydı al
+        performTxtLogSaveInternal(isAuto = true)
+      }
+    }
+  }
+
+  private fun performTxtLogSaveInternal(isAuto: Boolean) {
+    val record = com.example.engine.TxtLoggerManager.saveTxtLog(
+      context = getApplication(),
+      uiState = _uiState.value,
+      isAuto = isAuto
+    )
+    val updatedLogs = com.example.engine.TxtLoggerManager.loadAllLogs(getApplication())
+    _uiState.update { current ->
+      current.copy(
+        txtLogHistory = updatedLogs,
+        txtLogMessage = if (isAuto) "⏰ OTOMATİK 30 DK TXT LOG KAYDEDİLDİ (${record.timestampFormatted})"
+                        else "💾 MANUEL TXT LOG KAYDEDİLDİ (${record.fileName})"
+      )
+    }
+  }
+
+  fun performManualTxtLogSave() {
+    viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+      performTxtLogSaveInternal(isAuto = false)
+    }
+  }
+
+  fun selectTxtLogForView(record: com.example.engine.TxtLogRecord?) {
+    _uiState.update { it.copy(selectedTxtLogForView = record) }
+  }
+
+  fun deleteTxtLogRecord(filePath: String) {
+    viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+      com.example.engine.TxtLoggerManager.deleteLog(getApplication(), filePath)
+      val updatedLogs = com.example.engine.TxtLoggerManager.loadAllLogs(getApplication())
+      _uiState.update { current ->
+        val newSelected = if (current.selectedTxtLogForView?.filePath == filePath) null else current.selectedTxtLogForView
+        current.copy(
+          txtLogHistory = updatedLogs,
+          selectedTxtLogForView = newSelected,
+          txtLogMessage = "Log dosyası silindi."
+        )
+      }
+    }
+  }
+
+  fun deleteTxtLogRecords(filePaths: List<String>) {
+    if (filePaths.isEmpty()) return
+    viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+      filePaths.forEach { filePath ->
+        com.example.engine.TxtLoggerManager.deleteLog(getApplication(), filePath)
+      }
+      val updatedLogs = com.example.engine.TxtLoggerManager.loadAllLogs(getApplication())
+      _uiState.update { current ->
+        val newSelected = if (current.selectedTxtLogForView != null && filePaths.contains(current.selectedTxtLogForView.filePath)) null else current.selectedTxtLogForView
+        current.copy(
+          txtLogHistory = updatedLogs,
+          selectedTxtLogForView = newSelected,
+          txtLogMessage = "${filePaths.size} adet log dosyası silindi."
+        )
+      }
+    }
+  }
+
+  fun clearAllTxtLogs() {
+    viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+      com.example.engine.TxtLoggerManager.clearAllLogs(getApplication())
+      _uiState.update { current ->
+        current.copy(
+          txtLogHistory = emptyList(),
+          selectedTxtLogForView = null,
+          txtLogMessage = "Tüm TXT log kayıtları temizlendi."
+        )
+      }
+    }
+  }
+
+  fun dismissTxtLogMessage() {
+    _uiState.update { it.copy(txtLogMessage = null) }
   }
 }
 

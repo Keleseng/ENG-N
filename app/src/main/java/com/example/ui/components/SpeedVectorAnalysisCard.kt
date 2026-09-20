@@ -22,6 +22,10 @@ import com.example.model.SpeedCalculationResult
 import com.example.ui.theme.*
 import kotlin.math.*
 
+private fun formatKnots(value: Double): String {
+  return String.format(java.util.Locale.US, "%.1f", value)
+}
+
 @Composable
 fun SpeedVectorAnalysisCard(
   speedAnalysis: SpeedCalculationResult,
@@ -41,7 +45,7 @@ fun SpeedVectorAnalysisCard(
     modifier = modifier
       .fillMaxWidth()
       .testTag("card_speed_vector_analysis"),
-    shape = RoundedCornerShape(12.dp),
+    shape = RoundedCornerShape(8.dp),
     colors = CardDefaults.cardColors(containerColor = cardBg),
     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     border = androidx.compose.foundation.BorderStroke(1.dp, cardBorder)
@@ -49,7 +53,7 @@ fun SpeedVectorAnalysisCard(
     Column(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(10.dp)
+        .padding(6.dp)
     ) {
       // 1. Başlık
       Row(
@@ -131,7 +135,7 @@ fun SpeedVectorAnalysisCard(
             Spacer(modifier = Modifier.height(2.dp))
             Row(verticalAlignment = Alignment.Bottom) {
               Text(
-                text = "${speedAnalysis.gpsSpeedKnots}",
+                text = formatKnots(speedAnalysis.gpsSpeedKnots),
                 style = MaterialTheme.typography.titleMedium.copy(
                   fontWeight = FontWeight.Black,
                   fontSize = 18.sp
@@ -171,7 +175,7 @@ fun SpeedVectorAnalysisCard(
             Spacer(modifier = Modifier.height(2.dp))
             Row(verticalAlignment = Alignment.Bottom) {
               Text(
-                text = "${speedAnalysis.speedThroughWaterKnots}",
+                text = formatKnots(speedAnalysis.speedThroughWaterKnots),
                 style = MaterialTheme.typography.titleMedium.copy(
                   fontWeight = FontWeight.Black,
                   fontSize = 18.sp
@@ -211,7 +215,7 @@ fun SpeedVectorAnalysisCard(
             Spacer(modifier = Modifier.height(2.dp))
             Row(verticalAlignment = Alignment.Bottom) {
               Text(
-                text = "${speedAnalysis.calculatedGroundSpeedKnots}",
+                text = formatKnots(speedAnalysis.calculatedGroundSpeedKnots),
                 style = MaterialTheme.typography.titleMedium.copy(
                   fontWeight = FontWeight.Black,
                   fontSize = 18.sp
@@ -260,14 +264,14 @@ fun SpeedVectorAnalysisCard(
               )
               Spacer(modifier = Modifier.width(4.dp))
               Text(
-                text = "${if (speedAnalysis.deltaSpeedKnots > 0) "+" else ""}${speedAnalysis.deltaSpeedKnots} kn",
+                text = "${if (speedAnalysis.deltaSpeedKnots > 0) "+" else ""}${formatKnots(speedAnalysis.deltaSpeedKnots)} kn",
                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
                 color = if (speedAnalysis.deltaSpeedKnots >= 0) (if (isDarkMode) SeaGreen else Color(0xFF059669)) else (if (isDarkMode) WarningAmberDark else Color(0xFFB45309))
               )
             }
 
             Text(
-              text = "COG: ${String.format("%03d°", speedAnalysis.groundCourseDegrees)}",
+              text = "COG: ${String.format(java.util.Locale.US, "%03d°", speedAnalysis.groundCourseDegrees)}",
               style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 10.sp),
               color = if (isDarkMode) MarineCyan else PrimaryBlueDark
             )

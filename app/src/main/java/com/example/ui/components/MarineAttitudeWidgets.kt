@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.Icon
@@ -30,6 +31,8 @@ import kotlin.math.abs
 fun MarineInclinometerCard(
   attitude: MarineAttitude,
   isDark: Boolean,
+  onTare: () -> Unit = {},
+  onToggleHold: () -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   val cardBg = if (isDark) Color(0xFF1E293B) else Color.White
@@ -61,7 +64,7 @@ fun MarineInclinometerCard(
           )
           Spacer(modifier = Modifier.width(4.dp))
           Text(
-            text = "YALPA & MEYİL (INCLINOMETER)",
+            text = "MEHİL \\ TRİM (INCLINOMETER)",
             style = MaterialTheme.typography.labelSmall.copy(
               fontSize = 9.sp,
               fontWeight = FontWeight.Black,
@@ -71,27 +74,74 @@ fun MarineInclinometerCard(
           )
         }
 
-        Surface(
-          shape = RoundedCornerShape(3.dp),
-          color = when (attitude.stabilityStatus) {
-            "Dengeli" -> if (isDark) Color(0xFF064E3B) else Color(0xFFD1FAE5)
-            "Mutedil Yalpa" -> if (isDark) Color(0xFF78350F) else Color(0xFFFEF3C7)
-            else -> if (isDark) Color(0xFF7F1D1D) else Color(0xFFFEE2E2)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          // Sabitle (Dondur / Hold) butonu
+          Surface(
+            shape = RoundedCornerShape(3.dp),
+            color = if (attitude.isHoldActive) (if (isDark) Color(0xFF78350F) else Color(0xFFFEF3C7))
+                    else (if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0)),
+            modifier = Modifier
+              .clickable { onToggleHold() }
+              .testTag("btn_attitude_hold")
+          ) {
+            Text(
+              text = if (attitude.isHoldActive) "🔒 SABİT" else "DONDUR",
+              style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 7.5.sp,
+                fontWeight = FontWeight.Bold
+              ),
+              color = if (attitude.isHoldActive) (if (isDark) Color(0xFFFBBF24) else Color(0xFFB45309))
+                      else textSecondary,
+              modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.5.dp)
+            )
           }
-        ) {
-          Text(
-            text = if (attitude.isSensorActive) "● SENSÖR: ${attitude.stabilityStatus}" else "● SALINIM: ${attitude.stabilityStatus}",
-            style = MaterialTheme.typography.labelSmall.copy(
-              fontSize = 7.5.sp,
-              fontWeight = FontWeight.Bold
-            ),
+
+          Spacer(modifier = Modifier.width(4.dp))
+
+          // Sıfırla (Tare / Kalibre Et) butonu
+          Surface(
+            shape = RoundedCornerShape(3.dp),
+            color = if (isDark) Color(0xFF1E3A8A).copy(alpha = 0.6f) else Color(0xFFDBEAFE),
+            modifier = Modifier
+              .clickable { onTare() }
+              .testTag("btn_attitude_tare")
+          ) {
+            Text(
+              text = "SIFIRLA (TARE)",
+              style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 7.5.sp,
+                fontWeight = FontWeight.Bold
+              ),
+              color = if (isDark) Color(0xFF93C5FD) else Color(0xFF1D4ED8),
+              modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.5.dp)
+            )
+          }
+
+          Spacer(modifier = Modifier.width(4.dp))
+
+          // Sensör / Kararlı Salınım Durumu
+          Surface(
+            shape = RoundedCornerShape(3.dp),
             color = when (attitude.stabilityStatus) {
-              "Dengeli" -> if (isDark) Color(0xFF34D399) else Color(0xFF065F46)
-              "Mutedil Yalpa" -> if (isDark) Color(0xFFFBBF24) else Color(0xFF92400E)
-              else -> if (isDark) Color(0xFFF87171) else Color(0xFF991B1B)
-            },
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-          )
+              "Dengeli" -> if (isDark) Color(0xFF064E3B) else Color(0xFFD1FAE5)
+              "Mutedil Yalpa" -> if (isDark) Color(0xFF78350F) else Color(0xFFFEF3C7)
+              else -> if (isDark) Color(0xFF7F1D1D) else Color(0xFFFEE2E2)
+            }
+          ) {
+            Text(
+              text = if (attitude.isSensorActive) "● SENSÖR: ${attitude.stabilityStatus}" else "● KARARLI: ${attitude.stabilityStatus}",
+              style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 7.5.sp,
+                fontWeight = FontWeight.Bold
+              ),
+              color = when (attitude.stabilityStatus) {
+                "Dengeli" -> if (isDark) Color(0xFF34D399) else Color(0xFF065F46)
+                "Mutedil Yalpa" -> if (isDark) Color(0xFFFBBF24) else Color(0xFF92400E)
+                else -> if (isDark) Color(0xFFF87171) else Color(0xFF991B1B)
+              },
+              modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.5.dp)
+            )
+          }
         }
       }
 

@@ -59,14 +59,16 @@ object SpeedCalculationEngine {
     val effectiveSog = if (isGpsActive && gpsFix?.speedKnots != null) gpsSog else calculatedGroundSpeed
     val deltaSpeed = round((effectiveSog - speedThroughWaterKnots) * 10.0) / 10.0
 
+    val deltaSpeedFormatted = String.format(java.util.Locale.US, "%.1f", deltaSpeed)
     val speedEvaluation = when {
-      deltaSpeed > 0.4 -> "Akıntı ve rüzgar lehte: Yere göre sürat +${deltaSpeed} kn arttı."
-      deltaSpeed < -0.4 -> "Karşı akıntı/rüzgar direnci: Yere göre sürat ${deltaSpeed} kn azaldı."
-      else -> "Akıntı ve rüzgar etkisi dengeli (ΔV ≈ ${deltaSpeed} kn)."
+      deltaSpeed > 0.4 -> "Akıntı ve rüzgar lehte: Yere göre sürat +${deltaSpeedFormatted} kn arttı."
+      deltaSpeed < -0.4 -> "Karşı akıntı/rüzgar direnci: Yere göre sürat ${deltaSpeedFormatted} kn azaldı."
+      else -> "Akıntı ve rüzgar etkisi dengeli (ΔV ≈ ${deltaSpeedFormatted} kn)."
     }
 
+    val leewayFormatted = String.format(java.util.Locale.US, "%.1f", abs(leewayAngleDeg))
     val driftStatus = when {
-      abs(leewayAngleDeg) > 4.0 -> "Rüzgar kaçması (Leeway): ${round(abs(leewayAngleDeg) * 10.0) / 10.0}° (${if (leewayAngleDeg > 0) "Sancak" else "İskele"})."
+      abs(leewayAngleDeg) > 4.0 -> "Rüzgar kaçması (Leeway): ${leewayFormatted}° (${if (leewayAngleDeg > 0) "Sancak" else "İskele"})."
       abs(cogDeg - vesselHeadingDegrees) > 5 -> "Akıntı rotadan saptırıyor: COG ${cogDeg}° (Pruva: ${vesselHeadingDegrees}°)."
       else -> "Rota sapması nominal (Pruva ve COG uyumlu)."
     }

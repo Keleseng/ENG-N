@@ -6,12 +6,14 @@ import kotlin.math.abs
 data class MarineAttitude(
   val compassDegrees: Float = 270f,
   val compassCardinal: String = "B (Batı)",
-  val pitchDegrees: Float = 0.6f, // + = Baş, - = Kıç
-  val rollDegrees: Float = 1.8f,  // + = Sancak, - = İskele
+  val pitchDegrees: Float = -0.8f, // + = Baş, - = Kıç (doğal kıça trim)
+  val rollDegrees: Float = 1.4f,  // + = Sancak, - = İskele (doğal sancak meyil)
   val isSensorActive: Boolean = false,
-  val pitchLabel: String = "Baş +0.6°",
-  val rollLabel: String = "Sancak +1.8°",
-  val stabilityStatus: String = "Dengeli"
+  val pitchLabel: String = "Kıç -0.8°",
+  val rollLabel: String = "Sancak +1.4°",
+  val stabilityStatus: String = "Dengeli",
+  val isHoldActive: Boolean = false,
+  val isDampedFilterActive: Boolean = true
 ) {
   companion object {
     fun calculateCardinal(degrees: Float): String {
@@ -31,7 +33,7 @@ data class MarineAttitude(
     fun formatPitch(pitch: Float): String {
       val absVal = abs(pitch)
       return when {
-        absVal < 0.2f -> "0.0° (Düz)"
+        absVal < 0.1f -> "0.0° (Düz)"
         pitch > 0f -> "Baş +${String.format(Locale.US, "%.1f", absVal)}°"
         else -> "Kıç -${String.format(Locale.US, "%.1f", absVal)}°"
       }
@@ -40,7 +42,7 @@ data class MarineAttitude(
     fun formatRoll(roll: Float): String {
       val absVal = abs(roll)
       return when {
-        absVal < 0.2f -> "0.0° (Düz)"
+        absVal < 0.1f -> "0.0° (Düz)"
         roll > 0f -> "Sancak +${String.format(Locale.US, "%.1f", absVal)}°"
         else -> "İskele -${String.format(Locale.US, "%.1f", absVal)}°"
       }

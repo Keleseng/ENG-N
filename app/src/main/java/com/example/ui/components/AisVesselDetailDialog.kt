@@ -291,10 +291,10 @@ fun AisVesselDetailDialog(
                 }
               }
 
-              // MarineTraffic Doğrudan Tarayıcı Butonu
+              // MyShipTracking Doğrudan Tarayıcı Butonu
               OutlinedButton(
                 onClick = {
-                  val targetUrl = "https://www.marinetraffic.com/en/ais/home/centerx:${String.format(java.util.Locale.US, "%.4f", aisData.longitude)}/centery:${String.format(java.util.Locale.US, "%.4f", aisData.latitude)}/zoom:14"
+                  val targetUrl = if (aisData.myShipTrackingUrl.isNotBlank()) aisData.myShipTrackingUrl else "https://www.myshiptracking.com/?mmsi=${aisData.mmsi}"
                   val intent = Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl))
                   context.startActivity(intent)
                 },
@@ -304,11 +304,11 @@ fun AisVesselDetailDialog(
               ) {
                 Icon(Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("MarineTraffic Haritasında Aç", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+                Text("MyShipTracking Haritasında Aç", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
               }
             }
           } else {
-            // Canlı Gemi / Harita WebView (MarineTraffic)
+            // Canlı Gemi / Harita WebView (MyShipTracking)
             var dialogWebViewRef by remember { mutableStateOf<WebView?>(null) }
             DisposableEffect(Unit) {
               onDispose {
@@ -326,7 +326,7 @@ fun AisVesselDetailDialog(
             AndroidView(
               factory = { ctx ->
                 WebView(ctx).apply {
-                  setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null)
+                  setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                   settings.javaScriptEnabled = true
                   settings.domStorageEnabled = true
                   settings.databaseEnabled = true
@@ -366,7 +366,7 @@ fun AisVesselDetailDialog(
                       return true // Prevents app crash
                     }
                   }
-                  val dialogUrl = "https://www.marinetraffic.com/en/ais/home/centerx:${String.format(java.util.Locale.US, "%.4f", aisData.longitude)}/centery:${String.format(java.util.Locale.US, "%.4f", aisData.latitude)}/zoom:14"
+                  val dialogUrl = if (aisData.myShipTrackingUrl.isNotBlank()) aisData.myShipTrackingUrl else "https://www.myshiptracking.com/?mmsi=${aisData.mmsi}"
                   loadUrl(dialogUrl)
                   dialogWebViewRef = this
                 }

@@ -1,6 +1,6 @@
 {
   "name": "Denizci",
-  "description": "GPS konumu, canlı rüzgar, dalga yüksekliği, basınç, bağıl nem, yağış, rüzgar hamlesi, yere göre sürat ve gelgit güvenli geçiş hesaplayıcı",
+  "description": "GPS konumu, canlı rüzgar, dalga yüksekliği, basınç, bağıl nem, yağış, rüzgar hamlesi, yere göre sürat, demirleme kaloma hesabı ve deniz mevkileri dip tabiatı harita sembolleri (INT 1 / SHOD)",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

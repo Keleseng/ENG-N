@@ -15,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.border
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,6 +37,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -46,14 +48,14 @@ import androidx.core.content.ContextCompat
 import java.util.Locale
 import com.example.location.GpsLocationProvider
 import com.example.model.LocationPresets
-import com.example.sensor.MarineAttitudeProvider
 import com.example.ui.TideNavViewModel
 import com.example.ui.TideUiState
 import com.example.ui.components.AisVesselDetailDialog
 import com.example.ui.components.AnchorCalculationCard
 import com.example.ui.components.BridgeTelemetryCard
+import com.example.ui.components.EtaPositionCard
+import com.example.ui.components.InstantWaterDepthCard
 
-import com.example.ui.components.CompactEtaCard
 import com.example.ui.components.MarineInclinometerCard
 import com.example.ui.components.SpeedVectorAnalysisCard
 import com.example.ui.theme.*
@@ -75,18 +77,7 @@ fun InputParametersView(
   val context = LocalContext.current
   val coroutineScope = rememberCoroutineScope()
   val gpsProvider = remember { GpsLocationProvider(context) }
-  val attitudeProvider = remember { MarineAttitudeProvider(context) }
   var isVesselParamsExpanded by rememberSaveable { mutableStateOf(false) }
-
-  val baseHeading = remember(uiState.headingDegreesStr) {
-    uiState.headingDegreesStr.toFloatOrNull() ?: 270f
-  }
-
-  LaunchedEffect(baseHeading) {
-    attitudeProvider.startAttitudeUpdates(baseHeadingDegrees = baseHeading).collect { att ->
-      viewModel.updateMarineAttitude(att)
-    }
-  }
 
   val attitude = uiState.marineAttitude
   val isDark = uiState.isDarkMode
@@ -157,26 +148,32 @@ fun InputParametersView(
     }
   }
 
-  Column(
-    modifier = modifier
-      .fillMaxSize()
-      .verticalScroll(scrollState)
-      .padding(horizontal = 14.dp, vertical = 12.dp),
-    verticalArrangement = Arrangement.spacedBy(14.dp)
-  ) {
+  val configuration = LocalConfiguration.current
+  val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+
+  BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+    val isWideScreen = isLandscape || maxWidth > 600.dp
+
+    Column(
+      modifier = Modifier
+        .fillMaxSize()
+        .verticalScroll(scrollState)
+        .padding(horizontal = 6.dp, vertical = 3.dp),
+      verticalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
     // GPS & KÖPRÜÜSTÜ TELEMETRİ KARTI - TÜM VERİLER AYRI KUTUCUKLARDA
     val activeGps = uiState.lastGpsFix
     val displayLat = activeGps?.latitude ?: (com.example.model.LocationPresets.parseCoordinateOrDecimal(uiState.latStr) ?: uiState.selectedPort.latitude)
     val displayLon = activeGps?.longitude ?: (com.example.model.LocationPresets.parseCoordinateOrDecimal(uiState.lonStr) ?: uiState.selectedPort.longitude)
     Surface(
-      shape = RoundedCornerShape(10.dp),
+      shape = RoundedCornerShape(8.dp),
       color = if (isDark) Color(0xFF0F172A) else Color(0xFFE2E8F0),
       border = androidx.compose.foundation.BorderStroke(1.dp, if (isDark) Color(0xFF1E293B) else Color(0xFFCBD5E1)),
       modifier = Modifier.fillMaxWidth().testTag("card_gps_marine_telemetry")
     ) {
       Column(
-        modifier = Modifier.padding(10.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        modifier = Modifier.padding(5.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp)
       ) {
         // Canlı Telemetri Başlığı
         Row(
@@ -201,7 +198,7 @@ fun InputParametersView(
 
           Surface(
             shape = RoundedCornerShape(4.dp),
-            color = if (isDark) Color(0xFF1E293B) else Color.White
+            color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0)
           ) {
             Text(
               text = if (activeGps != null) "Hassasiyet: ±${String.format(Locale.US, "%.1f", activeGps.accuracyMeters)}m" else "STATİK / KÖPRÜÜSTÜ",
@@ -212,41 +209,53 @@ fun InputParametersView(
           }
         }
 
-        // 1. Satır Kutucuklar: Enlem & Boylam (Denizci DDM Formatında)
+        // 1. Satır Kutucuklar: Enlem & Boylam
         Row(
-          modifier = Modifier.fillMaxWidth(),
+          modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
           horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-          Surface(
-            shape = RoundedCornerShape(6.dp),
-            color = if (isDark) Color(0xFF1E293B) else Color.White,
-            border = androidx.compose.foundation.BorderStroke(0.5.dp, if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1)),
-            modifier = Modifier.weight(1f)
+          Box(
+            modifier = Modifier
+              .weight(1f)
+              .border(1.dp, Color(0xFFFACC15), RoundedCornerShape(4.dp))
+              .padding(horizontal = 12.dp, vertical = 14.dp)
           ) {
-            Column(modifier = Modifier.padding(7.dp)) {
-              Text("Enlem", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Bold), color = textSecondary)
-              Text(
-                text = LocationPresets.formatMarineLatDDM(displayLat),
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black, fontSize = 12.5.sp),
-                color = if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7)
-              )
-            }
+            Text(
+              text = "Enlem",
+              color = Color(0xFFFACC15),
+              style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+              modifier = Modifier
+                .offset(x = (-4).dp, y = (-22).dp)
+                .background(if (isDark) Color(0xFF0F172A) else Color(0xFFE2E8F0))
+                .padding(horizontal = 4.dp)
+            )
+            Text(
+              text = LocationPresets.formatMarineLatDMS(displayLat),
+              style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black, fontSize = 13.sp),
+              color = if (isDark) Color.White else Color.Black
+            )
           }
 
-          Surface(
-            shape = RoundedCornerShape(6.dp),
-            color = if (isDark) Color(0xFF1E293B) else Color.White,
-            border = androidx.compose.foundation.BorderStroke(0.5.dp, if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1)),
-            modifier = Modifier.weight(1f)
+          Box(
+            modifier = Modifier
+              .weight(1f)
+              .border(1.dp, Color(0xFFFACC15), RoundedCornerShape(4.dp))
+              .padding(horizontal = 12.dp, vertical = 14.dp)
           ) {
-            Column(modifier = Modifier.padding(7.dp)) {
-              Text("Boylam", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Bold), color = textSecondary)
-              Text(
-                text = LocationPresets.formatMarineLonDDM(displayLon),
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black, fontSize = 12.5.sp),
-                color = if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7)
-              )
-            }
+            Text(
+              text = "Boylam",
+              color = Color(0xFFFACC15),
+              style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+              modifier = Modifier
+                .offset(x = (-4).dp, y = (-22).dp)
+                .background(if (isDark) Color(0xFF0F172A) else Color(0xFFE2E8F0))
+                .padding(horizontal = 4.dp)
+            )
+            Text(
+              text = LocationPresets.formatMarineLonDMS(displayLon),
+              style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black, fontSize = 13.sp),
+              color = if (isDark) Color.White else Color.Black
+            )
           }
         }
 
@@ -254,7 +263,7 @@ fun InputParametersView(
         val compassDeg = attitude.compassDegrees.toInt()
         Surface(
           shape = RoundedCornerShape(6.dp),
-          color = if (isDark) Color(0xFF1E293B) else Color.White,
+          color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0),
           border = androidx.compose.foundation.BorderStroke(0.5.dp, if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1)),
           modifier = Modifier.fillMaxWidth().testTag("card_compass_heading")
         ) {
@@ -290,7 +299,7 @@ fun InputParametersView(
                 color = if (isDark) Color(0xFFFBBF24) else Color(0xFFB45309)
               )
               Text(
-                text = if (attitude.isSensorActive) "Canlı Sensör" else "Cayro / Manyetik",
+                text = if (attitude.isHoldActive) "🔒 Sabitlendi" else if (attitude.isSensorActive) "Canlı Sensör (Kararlı)" else "Cayro / Manyetik",
                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, color = textSecondary)
               )
             }
@@ -307,7 +316,7 @@ fun InputParametersView(
           // ROTA (COG)
           Surface(
             shape = RoundedCornerShape(6.dp),
-            color = if (isDark) Color(0xFF1E293B) else Color.White,
+            color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0),
             border = androidx.compose.foundation.BorderStroke(0.5.dp, if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1)),
             modifier = Modifier.weight(1f)
           ) {
@@ -343,7 +352,7 @@ fun InputParametersView(
           // HIZ (SOG)
           Surface(
             shape = RoundedCornerShape(6.dp),
-            color = if (isDark) Color(0xFF1E293B) else Color.White,
+            color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0),
             border = androidx.compose.foundation.BorderStroke(0.5.dp, if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1)),
             modifier = Modifier.weight(1f)
           ) {
@@ -377,13 +386,7 @@ fun InputParametersView(
           }
         }
 
-        // YALPA & EĞİM (BAŞ\KIÇ & SANCAK\İSKELE) - Rota ve Pusulanın altındaki pencere
-        MarineInclinometerCard(
-          attitude = attitude,
-          isDark = isDark
-        )
-
-              // 3. Satır Kutucuklar: Akıntı & Rüzgar
+        // 3. Satır Kutucuklar: Akıntı & Rüzgar
               val curr = uiState.analysis.currentInfo
               val wind = uiState.analysis.windInfo
               Row(
@@ -393,7 +396,7 @@ fun InputParametersView(
                 // AKINTI
                 Surface(
                   shape = RoundedCornerShape(6.dp),
-                  color = if (isDark) Color(0xFF1E293B) else Color.White,
+                  color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0),
                   border = androidx.compose.foundation.BorderStroke(0.5.dp, if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1)),
                   modifier = Modifier.weight(1f)
                 ) {
@@ -430,7 +433,7 @@ fun InputParametersView(
                 // RÜZGAR
                 Surface(
                   shape = RoundedCornerShape(6.dp),
-                  color = if (isDark) Color(0xFF1E293B) else Color.White,
+                  color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0),
                   border = androidx.compose.foundation.BorderStroke(0.5.dp, if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1)),
                   modifier = Modifier.weight(1f)
                 ) {
@@ -472,7 +475,7 @@ fun InputParametersView(
               ) {
                 Surface(
                   shape = RoundedCornerShape(6.dp),
-                  color = if (isDark) Color(0xFF1E293B) else Color.White,
+                  color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0),
                   border = androidx.compose.foundation.BorderStroke(0.5.dp, if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1)),
                   modifier = Modifier.weight(1f)
                 ) {
@@ -513,7 +516,7 @@ fun InputParametersView(
 
                 Surface(
                   shape = RoundedCornerShape(6.dp),
-                  color = if (isDark) Color(0xFF1E293B) else Color.White,
+                  color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0),
                   border = androidx.compose.foundation.BorderStroke(0.5.dp, if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1)),
                   modifier = Modifier.weight(1f)
                 ) {
@@ -559,34 +562,41 @@ fun InputParametersView(
           }
         }
 
-
-    // YENİ: BASİT HIZLI ETA KARTI
-    CompactEtaCard(
-      selectedDestination = uiState.selectedSimpleEtaDestination,
-      etaResult = uiState.simpleEtaResult,
-      onDestinationSelected = { viewModel.setSimpleEtaDestination(it) },
-      isDarkMode = isDark,
-      modifier = Modifier.padding(vertical = 10.dp)
+    // 4. ETA & MEVKİ GİRİŞİ PENCERESİ (DMS Koordinat Girişi, Hızlı Limanlar, Haritada Göster & ETA Hesabı)
+    EtaPositionCard(
+      uiState = uiState,
+      viewModel = viewModel,
+      onShowOnMap = { coord ->
+        viewModel.setMapFocusCoordinate(coord)
+        onNavigateToMap()
+      },
+      isDarkMode = isDark
     )
 
-    // 4. GPS SÜRATİ & YERE GÖRE SÜRAT ANALİZ KARTI
+    // 5. GPS SÜRATİ & YERE GÖRE SÜRAT ANALİZ KARTI
     SpeedVectorAnalysisCard(
       speedAnalysis = uiState.speedCalculationResult,
       onSyncGpsSpeed = { viewModel.syncGpsTelemetryToInputs() },
       onRequestGps = { requestLocationAndFetch() },
       isDarkMode = isDark
     )
-    
-    Spacer(modifier = Modifier.height(10.dp))
-    
-    // 5. ANLIK DURUM PENCERESİ (GELGİTTEN TAŞINAN)
-    BridgeTelemetryCard(
+
+    // 5. ANLIK SU DERİNLİĞİ HESAPLAMASI KARTI (ANLIK DURUM PENCERESİ KALDIRILDI)
+    InstantWaterDepthCard(
       analysis = uiState.analysis,
       isDarkMode = isDark
     )
 
-    Spacer(modifier = Modifier.height(16.dp))
+    // 6. MEHİL \ TRİM (INCLINOMETER) PENCERESİ
+    MarineInclinometerCard(
+      attitude = uiState.marineAttitude,
+      isDark = isDark,
+      onTare = { viewModel.tareAttitude() },
+      onToggleHold = { viewModel.toggleAttitudeHold() },
+      modifier = Modifier.fillMaxWidth()
+    )
   }
+}
 
   // AIS Gemi Detayları ve Canlı Bilgi İletişim Kutusu
   if (uiState.showAisDetailDialog) {
@@ -691,7 +701,7 @@ fun MiniShipHeadingIcon(
 
         // Pruva kerteriz yön çizgisi (Baş bodoslamadan ileriye doğru)
         drawLine(
-          color = if (isDark) Color.White else Color(0xFF0369A1),
+          color = if (isDark) Color(0xFFE2E8F0) else Color(0xFF0369A1),
           start = Offset(cx, h * 0.08f),
           end = Offset(cx, 0f),
           strokeWidth = 1.5f

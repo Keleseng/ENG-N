@@ -32,7 +32,56 @@ data class AnchorCalculationParams(
   val distBridgeToSternMeters: Double = 85.0, // Köprüüstü -> Kıç mesafesi (85 m)
   val loaMeters: Double = 120.0, // LOA (Gemi Tam Boyu = 35 + 85 = 120 m)
   val safetyMarginMeters: Double = 0.0, // İlave emniyet marjı (opsiyonel)
-  val bottomType: AnchorBottomType = AnchorBottomType.MUD_SAND
+  val bottomType: AnchorBottomType = AnchorBottomType.MUD_SAND,
+  val windSpeedKnots: Double = 12.0, // Deniz Rüzgar Hızı (knot)
+  val waveHeightMeters: Double = 0.5, // Deniz Dalga Yüksekliği (m)
+  val beaufortScale: Int = 3, // Beaufort Skalası
+  val seaStateDescription: String = "Sakin" // Deniz Durumu
+)
+
+enum class WeatherSeverityLevel(
+  val labelTr: String,
+  val iconEmoji: String,
+  val badgeColorDarkHex: Long,
+  val badgeColorLightHex: Long
+) {
+  CALM("Sakin / Hafif Deniz", "🌤️", 0xFF059669, 0xFF10B981),
+  MODERATE("Orta Çalkantılı Deniz", "🌊", 0xFFD97706, 0xFFF59E0B),
+  ROUGH("Sert Rüzgar / Kaba Deniz", "💨", 0xFFDC2626, 0xFFEF4444),
+  STORM("Fırtına / Ağır Deniz Koşulları", "🌪️", 0xFF991B1B, 0xFFB91C1C)
+}
+
+enum class ChainRecommendationStatus(val labelTr: String, val isSafe: Boolean) {
+  DEFICIENT("YETERSİZ KALOMA - ZİNCİR ARTIRILMALI", false),
+  OPTIMAL("İDEAL VE EMNİYETLİ KALOMA", true),
+  EXCESSIVE("GENİŞ KALOMA (SALMA DAİRESİ GENİŞ)", true)
+}
+
+enum class AnchorWeatherScenario(val labelTr: String, val shortDesc: String) {
+  LIVE("Canlı Deniz Havası", "İstasyon / GPS telemetrisi"),
+  CALM("Sakin Deniz (Meltem)", "Rüzgar <15 kn • Dalga <0.6 m"),
+  MODERATE("Orta Çalkantılı", "Rüzgar 20 kn • Dalga 1.2 m"),
+  ROUGH("Sert / Fırtınamsı", "Rüzgar 30 kn • Dalga 2.0 m"),
+  STORM("Fırtına / Ağır Deniz", "Rüzgar 42 kn • Dalga 3.5 m")
+}
+
+data class RecommendedChainScope(
+  val recommendedShackles: Double, // Örn. 5.0 kilit
+  val recommendedShacklesMin: Double, // Örn. 4.5 kilit
+  val recommendedShacklesMax: Double, // Örn. 6.0 kilit
+  val recommendedMeters: Double, // Örn. 137.5 m
+  val minSafeShackles: Double, // Asgari emniyet sınırı (örn. 3.0 kilit)
+  val heavyWeatherShackles: Double, // Fırtına emniyet kaloması (örn. 7.5 kilit)
+  val scopeRatio: Double, // Mevcut kaloma oranı: a / depth
+  val recommendedScopeRatio: Double, // Tavsiye edilen kaloma oranı (örn. 4.8x)
+  val weatherSeverity: WeatherSeverityLevel,
+  val weatherSummaryTr: String, // "Rüzgar: 18 kn • Dalga: 1.2 m (Beaufort 5 - Orta Çalkantılı)"
+  val status: ChainRecommendationStatus,
+  val differenceShackles: Double, // Mevcut kilit - Tavsiye edilen kilit
+  val differenceMeters: Double,
+  val recommendationHeading: String, // "5.0 Kilit (137.5 m) Zincir Döşenmesi Tavsiye Edilir"
+  val recommendationDetailTr: String, // Detaylı denizcilik açıklaması
+  val seamanshipRuleText: String // "Donanma & Derinlik/Dalga Katsayısı"
 )
 
 enum class AnchorBottomType(val displayNameTr: String, val holdingFactorDesc: String, val recommendedScope: String) {
@@ -87,7 +136,8 @@ data class AnchorCalculationResult(
   val distBridgeToSternMeters: Double,
   val loaMeters: Double,
   val safetyMarginMeters: Double,
-  val isChainShorterThanDepth: Boolean
+  val isChainShorterThanDepth: Boolean,
+  val recommendedChainScope: RecommendedChainScope? = null
 ) {
   val formattedA: String get() = String.format(Locale.US, "%.1f m (%.1f Kilit / %.1f Kulaç)", a_chainScopeMeters, a_chainScopeShackles, a_chainScopeFathoms)
   val formattedB: String get() = String.format(Locale.US, "%.1f m (%.1f ft / %.1f Kulaç)", b_depthMeters, b_depthFeet, b_depthFathoms)

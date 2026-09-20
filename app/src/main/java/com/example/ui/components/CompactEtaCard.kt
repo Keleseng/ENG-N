@@ -1,13 +1,12 @@
 package com.example.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
@@ -35,9 +34,6 @@ fun CompactEtaCard(
   var cityExpanded by remember { mutableStateOf(false) }
   var pierExpanded by remember { mutableStateOf(false) }
 
-  var manualLat by remember { mutableStateOf("") }
-  var manualLon by remember { mutableStateOf("") }
-
   var selectedCity by remember(selectedDestination) {
     mutableStateOf(
       if (selectedDestination == null) null
@@ -53,7 +49,7 @@ fun CompactEtaCard(
   val accentColor = if (isDarkMode) MarineCyan else PrimaryBlueDark
 
   Card(
-    shape = RoundedCornerShape(12.dp),
+    shape = RoundedCornerShape(8.dp),
     colors = CardDefaults.cardColors(containerColor = cardBg),
     border = androidx.compose.foundation.BorderStroke(1.dp, cardBorder),
     modifier = modifier.fillMaxWidth()
@@ -61,14 +57,17 @@ fun CompactEtaCard(
     Column(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(horizontal = 12.dp, vertical = 10.dp)
+        .padding(horizontal = 8.dp, vertical = 6.dp)
     ) {
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
       ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(0.35f)) {
+        Row(
+          verticalAlignment = Alignment.CenterVertically,
+          modifier = Modifier.weight(0.35f)
+        ) {
           Icon(
             imageVector = Icons.Default.Navigation,
             contentDescription = null,
@@ -77,7 +76,7 @@ fun CompactEtaCard(
           )
           Spacer(modifier = Modifier.width(4.dp))
           Text(
-            text = "ETA",
+            text = "ETA & Hedef",
             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 12.sp),
             color = textPrimary
           )
@@ -101,7 +100,7 @@ fun CompactEtaCard(
                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
               ) {
                 Text(
-                  text = selectedCity ?: "Şehir",
+                  text = selectedCity ?: "Şehir Seç",
                   style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                   color = if (selectedCity != null) textPrimary else textMuted,
                   maxLines = 1,
@@ -122,13 +121,11 @@ fun CompactEtaCard(
               modifier = Modifier.background(cardBg).heightIn(max = 300.dp)
             ) {
               DropdownMenuItem(
-                text = { Text("Temizle", fontSize = 11.sp, color = textMuted) },
+                text = { Text("Tümünü Temizle", fontSize = 11.sp, color = textMuted) },
                 onClick = {
                   selectedCity = null
                   onDestinationSelected(null)
                   cityExpanded = false
-                  manualLat = ""
-                  manualLon = ""
                 }
               )
               HorizontalDivider(color = cardBorder)
@@ -147,8 +144,6 @@ fun CompactEtaCard(
                     onDestinationSelected(null)
                     cityExpanded = false
                     pierExpanded = true
-                    manualLat = ""
-                    manualLon = ""
                   }
                 )
               }
@@ -172,7 +167,7 @@ fun CompactEtaCard(
                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
               ) {
                 Text(
-                  text = selectedDestination?.name ?: "İskele/Liman",
+                  text = selectedDestination?.name ?: "İskele / Liman",
                   style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                   color = if (selectedDestination != null) textPrimary else textMuted,
                   maxLines = 1,
@@ -192,6 +187,14 @@ fun CompactEtaCard(
               onDismissRequest = { pierExpanded = false },
               modifier = Modifier.background(cardBg).heightIn(max = 300.dp)
             ) {
+              DropdownMenuItem(
+                text = { Text("Seçimi Kaldır", fontSize = 11.sp, color = textMuted) },
+                onClick = {
+                  onDestinationSelected(null)
+                  pierExpanded = false
+                }
+              )
+              HorizontalDivider(color = cardBorder)
               if (selectedCity != null) {
                 TurkishPorts.regions[selectedCity]?.forEach { port ->
                   DropdownMenuItem(
@@ -206,87 +209,40 @@ fun CompactEtaCard(
                     onClick = {
                       onDestinationSelected(port)
                       pierExpanded = false
-                      manualLat = ""
-                      manualLon = ""
                     }
                   )
                 }
               }
             }
           }
+
+          if (selectedDestination != null) {
+            Spacer(modifier = Modifier.width(4.dp))
+            IconButton(
+              onClick = {
+                onDestinationSelected(null)
+                selectedCity = null
+              },
+              modifier = Modifier.size(22.dp)
+            ) {
+              Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "Temizle",
+                tint = textMuted,
+                modifier = Modifier.size(14.dp)
+              )
+            }
+          }
         }
       }
 
-      Spacer(modifier = Modifier.height(6.dp))
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-      ) {
-        Text(
-          text = "GPS:",
-          style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
-          color = textMuted,
-          modifier = Modifier.weight(0.15f)
-        )
-        Row(
-          modifier = Modifier.weight(0.85f),
-          horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-          BasicTextField(
-            value = manualLat,
-            onValueChange = { 
-              manualLat = it
-              val lat = parseCoordinate(it)
-              val lon = parseCoordinate(manualLon)
-              if (lat != null && lon != null) {
-                onDestinationSelected(SimpleDestination("Manuel: ${String.format(java.util.Locale.US, "%.4f", lat)}, ${String.format(java.util.Locale.US, "%.4f", lon)}", lat, lon))
-              }
-            },
-            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 10.sp, color = textPrimary),
-            singleLine = true,
-            modifier = Modifier
-              .weight(1f)
-              .background(subtleBg, RoundedCornerShape(4.dp))
-              .border(1.dp, cardBorder, RoundedCornerShape(4.dp))
-              .padding(horizontal = 6.dp, vertical = 4.dp),
-            decorationBox = { innerTextField ->
-              if (manualLat.isEmpty()) Text("Enlem (41°00'49\"K)", fontSize = 9.sp, color = textMuted, maxLines = 1)
-              innerTextField()
-            }
-          )
-          
-          BasicTextField(
-            value = manualLon,
-            onValueChange = { 
-              manualLon = it
-              val lat = parseCoordinate(manualLat)
-              val lon = parseCoordinate(it)
-              if (lat != null && lon != null) {
-                onDestinationSelected(SimpleDestination("Manuel: ${String.format(java.util.Locale.US, "%.4f", lat)}, ${String.format(java.util.Locale.US, "%.4f", lon)}", lat, lon))
-              }
-            },
-            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 10.sp, color = textPrimary),
-            singleLine = true,
-            modifier = Modifier
-              .weight(1f)
-              .background(subtleBg, RoundedCornerShape(4.dp))
-              .border(1.dp, cardBorder, RoundedCornerShape(4.dp))
-              .padding(horizontal = 6.dp, vertical = 4.dp),
-            decorationBox = { innerTextField ->
-              if (manualLon.isEmpty()) Text("Boylam (28°58'33\"D)", fontSize = 9.sp, color = textMuted, maxLines = 1)
-              innerTextField()
-            }
-          )
-        }
-      }
-
+      // ETA Sonuç Kartı
       if (etaResult != null) {
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         Surface(
           shape = RoundedCornerShape(8.dp),
-          color = if (isDarkMode) PrimaryBlueLight.copy(alpha=0.3f) else Color(0xFFEFF6FF),
-          border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryBlueBorder.copy(alpha=0.5f)),
+          color = if (isDarkMode) PrimaryBlueLight.copy(alpha = 0.3f) else Color(0xFFEFF6FF),
+          border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryBlueBorder.copy(alpha = 0.5f)),
           modifier = Modifier.fillMaxWidth()
         ) {
           Row(
@@ -334,25 +290,4 @@ fun CompactEtaCard(
       }
     }
   }
-}
-
-private fun parseCoordinate(input: String): Double? {
-  // Try DMS format (e.g., 41°00'49"K or 28° 58' 33" D)
-  val dmsRegex = Regex("""(\d+)[°\s]+(\d+)['\s]+([\d.]+)["]\s*([KkGgDdBbNnSsEeWw])""")
-  val match = dmsRegex.find(input)
-  if (match != null) {
-    val degrees = match.groupValues[1].toDoubleOrNull() ?: 0.0
-    val minutes = match.groupValues[2].toDoubleOrNull() ?: 0.0
-    val seconds = match.groupValues[3].toDoubleOrNull() ?: 0.0
-    val direction = match.groupValues[4].uppercase()
-    
-    var decimal = degrees + (minutes / 60.0) + (seconds / 3600.0)
-    if (direction == "G" || direction == "S" || direction == "B" || direction == "W") {
-      decimal *= -1.0
-    }
-    return decimal
-  }
-  
-  // Fallback to plain decimal
-  return input.trim().replace(',', '.').toDoubleOrNull()
 }

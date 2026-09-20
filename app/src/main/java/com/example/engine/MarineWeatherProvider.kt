@@ -31,8 +31,11 @@ class MarineWeatherProvider {
           "&wind_speed_unit=kn&timezone=auto"
 
       val weatherRequest = Request.Builder().url(weatherUrl).build()
-      val weatherResponse = httpClient.newCall(weatherRequest).execute()
-      val weatherJsonStr = weatherResponse.body?.string()
+      var weatherSuccessful = false
+      val weatherJsonStr = httpClient.newCall(weatherRequest).execute().use { response ->
+        weatherSuccessful = response.isSuccessful
+        if (response.isSuccessful) response.body?.string() else null
+      }
 
       // 2. Open-Meteo & Copernicus Marine (CMEMS) Deniz Durumu & Akıntı
       var waveHeight = 0.8
@@ -49,9 +52,11 @@ class MarineWeatherProvider {
             "&timezone=auto"
 
         val marineRequest = Request.Builder().url(marineUrl).build()
-        val marineResponse = httpClient.newCall(marineRequest).execute()
-        if (marineResponse.isSuccessful) {
-          val marineJson = JSONObject(marineResponse.body?.string() ?: "{}")
+        val marineJsonStr = httpClient.newCall(marineRequest).execute().use { response ->
+          if (response.isSuccessful) response.body?.string() else null
+        }
+        if (!marineJsonStr.isNullOrBlank()) {
+          val marineJson = JSONObject(marineJsonStr)
           val currentMarine = marineJson.optJSONObject("current")
           if (currentMarine != null) {
             val wh = currentMarine.optDouble("wave_height", Double.NaN)
@@ -75,7 +80,7 @@ class MarineWeatherProvider {
         Log.w("MarineWeather", "Copernicus Marine API call skipped or internal sea, using wave-current model: ${e.message}")
       }
 
-      if (weatherResponse.isSuccessful && !weatherJsonStr.isNullOrBlank()) {
+      if (weatherSuccessful && !weatherJsonStr.isNullOrBlank()) {
         val json = JSONObject(weatherJsonStr)
         val current = json.getJSONObject("current")
 

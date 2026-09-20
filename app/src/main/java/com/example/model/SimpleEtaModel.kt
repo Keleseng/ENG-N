@@ -7,12 +7,77 @@ import kotlin.math.roundToInt
 
 data class SimpleDestination(val name: String, val lat: Double, val lon: Double)
 
+data class Coordinate(
+  val latitude: Double,
+  val longitude: Double
+)
+
+fun dmsToDecimal(
+  degrees: Int,
+  minutes: Int,
+  seconds: Double,
+  direction: Char
+): Double {
+  var decimal = degrees +
+      minutes / 60.0 +
+      seconds / 3600.0
+
+  val d = direction.uppercaseChar()
+  if (d == 'S' || d == 'G' || d == 'W' || d == 'B') {
+    decimal *= -1
+  }
+
+  return decimal
+}
+
+data class DmsTriple(
+  val degrees: String,
+  val minutes: String,
+  val seconds: String,
+  val direction: String
+)
+
+fun decimalToDmsParts(decimal: Double, isLatitude: Boolean): DmsTriple {
+  val dir = if (isLatitude) {
+    if (decimal >= 0) "Kuzey" else "Güney"
+  } else {
+    if (decimal >= 0) "Doğu" else "Batı"
+  }
+  val absVal = kotlin.math.abs(decimal)
+  val d = absVal.toInt()
+  val remMin = (absVal - d) * 60.0
+  val m = remMin.toInt()
+  val s = (remMin - m) * 60.0
+  val secRounded = Math.round(s * 10.0) / 10.0
+  return DmsTriple(
+    degrees = if (isLatitude) String.format(Locale.US, "%02d", d) else String.format(Locale.US, "%03d", d),
+    minutes = String.format(Locale.US, "%02d", m),
+    seconds = String.format(Locale.US, "%.1f", secRounded),
+    direction = dir
+  )
+}
+
+data class EtaSummaryReceipt(
+  val targetName: String? = null,
+  val latDms: String,
+  val lonDms: String,
+  val distanceNm: Double,
+  val bearingDegrees: Int,
+  val speedKnots: Double,
+  val etaTime: String,
+  val fullEtaDate: String = ""
+)
+
 data class SimpleEtaResult(
   val destinationName: String,
   val distanceNm: Double,
   val speedKnots: Double,
   val durationStr: String,
-  val etaStr: String
+  val etaStr: String,
+  val bearingDegrees: Int = 0,
+  val latDms: String = "",
+  val lonDms: String = "",
+  val etaTimeOnly: String = ""
 )
 
 object TurkishPorts {
@@ -251,33 +316,73 @@ fun calculateSimpleEta(
   dest: SimpleDestination
 ): SimpleEtaResult {
   val dist = com.example.model.calculateHaversineDistanceNm(startLat, startLon, dest.lat, dest.lon)
-  val safeSpeed = if (speed < 0.1) 0.0 else speed
+  val bearing = com.example.model.LocationPresets.calculateBearingDegrees(startLat, startLon, dest.lat, dest.lon)
+  val isDefaultSpeed = speed < 0.1
+  val safeSpeed = if (isDefaultSpeed) 12.0 else speed
 
-  if (safeSpeed == 0.0) {
-    return SimpleEtaResult(
-      destinationName = dest.name,
-      distanceNm = Math.round(dist * 10.0) / 10.0,
-      speedKnots = 0.0,
-      durationStr = "--",
-      etaStr = "Hareketsiz (Sürat 0)"
-    )
-  }
-  
   val totalHours = dist / safeSpeed
   val totalMins = (totalHours * 60).roundToInt()
   val hrs = totalMins / 60
   val mins = totalMins % 60
-  val durStr = "${hrs}sa ${mins}dk"
+  val durStr = if (isDefaultSpeed) "${hrs}sa ${mins}dk (12 kn)" else "${hrs}sa ${mins}dk"
 
   val etaMillis = System.currentTimeMillis() + (totalMins * 60L * 1000L)
   val sdf = SimpleDateFormat("dd MMM, HH:mm", Locale("tr"))
+  val timeOnlySdf = SimpleDateFormat("HH:mm", Locale.US)
   val etaStr = sdf.format(Date(etaMillis))
+  val timeOnlyStr = timeOnlySdf.format(Date(etaMillis))
+
+  val latParts = decimalToDmsParts(dest.lat, true)
+  val lonParts = decimalToDmsParts(dest.lon, false)
+  val latDms = "${latParts.degrees}°${latParts.minutes}'${latParts.seconds}\"${latParts.direction}"
+  val lonDms = "${lonParts.degrees}°${lonParts.minutes}'${lonParts.seconds}\"${lonParts.direction}"
 
   return SimpleEtaResult(
     destinationName = dest.name,
     distanceNm = Math.round(dist * 10.0) / 10.0,
     speedKnots = Math.round(safeSpeed * 10.0) / 10.0,
     durationStr = durStr,
-    etaStr = etaStr
+    etaStr = etaStr,
+    bearingDegrees = bearing,
+    latDms = latDms,
+    lonDms = lonDms,
+    etaTimeOnly = timeOnlyStr
+  )
+}
+
+fun computeEtaSummary(
+  startLat: Double,
+  startLon: Double,
+  speedKnots: Double,
+  targetCoord: Coordinate,
+  targetName: String? = null
+): EtaSummaryReceipt {
+  val dist = com.example.model.calculateHaversineDistanceNm(startLat, startLon, targetCoord.latitude, targetCoord.longitude)
+  val bearing = com.example.model.LocationPresets.calculateBearingDegrees(startLat, startLon, targetCoord.latitude, targetCoord.longitude)
+  val safeSpeed = if (speedKnots < 0.5) 12.0 else speedKnots
+
+  val totalHours = dist / safeSpeed
+  val totalMins = (totalHours * 60).roundToInt()
+
+  val etaMillis = System.currentTimeMillis() + (totalMins * 60L * 1000L)
+  val timeSdf = SimpleDateFormat("HH:mm", Locale.US)
+  val fullDateSdf = SimpleDateFormat("dd MMM, HH:mm", Locale("tr"))
+  val etaTimeStr = timeSdf.format(Date(etaMillis))
+  val fullDateStr = fullDateSdf.format(Date(etaMillis))
+
+  val latParts = decimalToDmsParts(targetCoord.latitude, true)
+  val lonParts = decimalToDmsParts(targetCoord.longitude, false)
+  val latDms = "${latParts.degrees}°${latParts.minutes}'${latParts.seconds}\"${latParts.direction}"
+  val lonDms = "${lonParts.degrees}°${lonParts.minutes}'${lonParts.seconds}\"${lonParts.direction}"
+
+  return EtaSummaryReceipt(
+    targetName = targetName,
+    latDms = latDms,
+    lonDms = lonDms,
+    distanceNm = Math.round(dist * 10.0) / 10.0,
+    bearingDegrees = bearing,
+    speedKnots = Math.round(safeSpeed * 10.0) / 10.0,
+    etaTime = etaTimeStr,
+    fullEtaDate = fullDateStr
   )
 }

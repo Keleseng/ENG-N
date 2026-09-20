@@ -84,9 +84,7 @@ fun AnchorCalculationCard(
   onNavigateToMap: () -> Unit = {},
   modifier: Modifier = Modifier
 ) {
-  var isExpanded by rememberSaveable { mutableStateOf(true) }
   var showAdvancedInputs by rememberSaveable { mutableStateOf(false) }
-  var activeDiagramTab by rememberSaveable { mutableStateOf(0) } // 0: Yan Kesit, 1: Kuşbakışı Radar
 
   val isDark = uiState.isDarkMode
   val result = uiState.anchorCalculationResult
@@ -114,13 +112,6 @@ fun AnchorCalculationCard(
     unfocusedLabelColor = inputLabel,
     cursorColor = if (isDark) MarineYellowBold else Color(0xFFD97706)
   )
-
-  val chevronRotation by animateFloatAsState(
-    targetValue = if (isExpanded) 180f else 0f,
-    label = "anchorExpand"
-  )
-
-  var isFullScreenMap by rememberSaveable { mutableStateOf(false) }
 
   // Alarm sound logic for Anchor Dragging
   val context = LocalContext.current
@@ -180,7 +171,6 @@ fun AnchorCalculationCard(
       Row(
         modifier = Modifier
           .fillMaxWidth()
-          .clickable { isExpanded = !isExpanded }
           .padding(horizontal = 10.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -244,24 +234,10 @@ fun AnchorCalculationCard(
               modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
             )
           }
-          Spacer(modifier = Modifier.width(6.dp))
-          Icon(
-            imageVector = Icons.Default.KeyboardArrowDown,
-            contentDescription = null,
-            tint = textSecondary,
-            modifier = Modifier
-              .size(22.dp)
-              .rotate(chevronRotation)
-          )
         }
       }
 
-      AnimatedVisibility(
-        visible = isExpanded,
-        enter = expandVertically() + fadeIn(),
-        exit = shrinkVertically() + fadeOut()
-      ) {
-        Column(
+      Column(
           modifier = Modifier
             .fillMaxWidth()
             .padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
@@ -272,24 +248,17 @@ fun AnchorCalculationCard(
           // ══════════════════════════════════════════════════════════════
           // 2. GİRİŞ PARAMETRELERİ (Kilit Standardı, Kilit Sayısı, b, c, Gemi Boyutları)
           // ══════════════════════════════════════════════════════════════
-          Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = subtleBg,
-            border = androidx.compose.foundation.BorderStroke(1.dp, subtleBorder)
+          Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
           ) {
-            Column(
-              modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-              verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
               Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
               ) {
                 Text(
-                  text = "Hesaplama Parametreleri",
+                  text = "Hesaplama",
                   style = MaterialTheme.typography.titleSmall.copy(
                     fontWeight = FontWeight.Bold,
                     fontSize = 11.sp
@@ -377,6 +346,49 @@ fun AnchorCalculationCard(
                   modifier = Modifier.padding(horizontal = 9.dp, vertical = 7.dp),
                   verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                  // Otomatik Zincir Hesabı Başlığı ve Durum Göstergesi
+                  Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                  ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                      Icon(
+                        imageVector = if (uiState.isAnchorChainAuto) Icons.Default.AutoAwesome else Icons.Default.Edit,
+                        contentDescription = null,
+                        tint = if (uiState.isAnchorChainAuto) SeaGreen else (if (isDark) MarineYellow else Color(0xFFD97706)),
+                        modifier = Modifier.size(11.dp)
+                      )
+                      Text(
+                        text = if (uiState.isAnchorChainAuto) "Otomatik Zincir Boyu (Hava / Deniz / Batimetri)" else "Elle Girilmiş Kaloma (Manuel)",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                          fontSize = 8.5.sp,
+                          fontWeight = FontWeight.Bold,
+                          color = if (uiState.isAnchorChainAuto) SeaGreen else textSecondary
+                        )
+                      )
+                    }
+
+                    if (!uiState.isAnchorChainAuto) {
+                      Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = SeaGreen.copy(alpha = 0.15f),
+                        border = androidx.compose.foundation.BorderStroke(0.6.dp, SeaGreen),
+                        modifier = Modifier.clickable { viewModel.setAnchorChainAuto(true) }
+                      ) {
+                        Text(
+                          text = "⚡ Otomatiğe Dön",
+                          style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = SeaGreen
+                          ),
+                          modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                        )
+                      }
+                    }
+                  }
+
                   Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -437,7 +449,7 @@ fun AnchorCalculationCard(
                     OutlinedTextField(
                       value = uiState.anchorChainScopeStr,
                       onValueChange = { viewModel.updateAnchorCalculation(chainScope = it) },
-                      label = { Text("Kaloma", fontSize = 9.sp, fontWeight = FontWeight.Bold) },
+                      label = { Text("Zincir Boyu", fontSize = 9.sp, fontWeight = FontWeight.Bold) },
                       trailingIcon = {
                         Text(
                           text = "m",
@@ -469,8 +481,31 @@ fun AnchorCalculationCard(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                   ) {
+                    // Oto Kaloma Butonu
+                    Surface(
+                      shape = RoundedCornerShape(4.dp),
+                      color = if (uiState.isAnchorChainAuto) SeaGreen else (if (isDark) Color(0xFF0F1B2F) else Color(0xFFE2E8F0)),
+                      border = androidx.compose.foundation.BorderStroke(
+                        0.8.dp,
+                        if (uiState.isAnchorChainAuto) SeaGreen else subtleBorder
+                      ),
+                      modifier = Modifier.clickable {
+                        viewModel.setAnchorChainAuto(true)
+                      }
+                    ) {
+                      Text(
+                        text = "⚡ Oto Kaloma",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                          fontWeight = if (uiState.isAnchorChainAuto) FontWeight.Black else FontWeight.Bold,
+                          fontSize = 8.5.sp,
+                          color = if (uiState.isAnchorChainAuto) Color.White else textPrimary
+                        ),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp)
+                      )
+                    }
+
                     listOf(3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 10.0).forEach { shackles ->
-                      val isCurrent = kotlin.math.abs(result.a_chainScopeShackles - shackles) < 0.15
+                      val isCurrent = !uiState.isAnchorChainAuto && kotlin.math.abs(result.a_chainScopeShackles - shackles) < 0.15
                       Surface(
                         shape = RoundedCornerShape(4.dp),
                         color = if (isCurrent) (if (isDark) Color(0xFF1D4ED8) else PrimaryBlue) else (if (isDark) Color(0xFF0F1B2F) else Color(0xFFE2E8F0)),
@@ -532,126 +567,284 @@ fun AnchorCalculationCard(
                 }
               }
 
-              // Derinlik Tavsiye Kutusu
-              val recDepth = result.b_depthMeters
-              if (recDepth > 0) {
-                  val recommendation = when {
-                      recDepth < 10.0 -> "Sığ su: Çapalamanın iyi tutunması için en az 3-4 kilit veya derinliğin 4-5 katı kaloma uygulanması önerilir."
-                      recDepth <= 20.0 -> "Orta derinlik: Güvenli demirleme için derinliğin 4-5 katı (genellikle 3-5 kilit) kaloma verilmesi tavsiye edilir."
-                      recDepth <= 40.0 -> "Derin su: Rüzgar şiddetine bağlı olarak derinliğin 3-4 katı (genellikle 5-8 kilit) kaloma verilmesi uygundur."
-                      else -> "Çok derin su: Demirleme zorluğu yaşanabilir, derinliğin en az 3 katı ve çevresel şartlara göre yeterli emniyet payı içeren kaloma sağlanmalıdır."
-                  }
-                  
-                  Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0)),
-                    modifier = Modifier.fillMaxWidth()
+              // ══════════════════════════════════════════════════════════════
+              // HAVA, DALGA VE DERİNLİĞE GÖRE TAVSİYE EDİLEN KİLİT / KALOMA
+              // ══════════════════════════════════════════════════════════════
+              val recScope = result.recommendedChainScope
+              if (recScope != null) {
+                Surface(
+                  shape = RoundedCornerShape(10.dp),
+                  color = if (isDark) Color(0xFF0F172A) else Color(0xFFF1F5F9),
+                  border = androidx.compose.foundation.BorderStroke(
+                    1.2.dp,
+                    when (recScope.status) {
+                      ChainRecommendationStatus.DEFICIENT -> if (isDark) Color(0xFFDC2626) else Color(0xFFEF4444)
+                      ChainRecommendationStatus.OPTIMAL -> if (isDark) Color(0xFF059669) else Color(0xFF10B981)
+                      ChainRecommendationStatus.EXCESSIVE -> if (isDark) Color(0xFF0284C7) else Color(0xFF0EA5E9)
+                    }
+                  ),
+                  modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("card_anchor_recommendation")
+                ) {
+                  Column(
+                    modifier = Modifier
+                      .fillMaxWidth()
+                      .padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                   ) {
+                    // 1. Başlık ve Durum Rozeti
                     Row(
-                      modifier = Modifier.padding(10.dp),
-                      verticalAlignment = Alignment.Top
+                      modifier = Modifier.fillMaxWidth(),
+                      horizontalArrangement = Arrangement.SpaceBetween,
+                      verticalAlignment = Alignment.CenterVertically
                     ) {
-                      Icon(Icons.Default.Info, contentDescription = "Tavsiye", tint = if (isDark) Color(0xFF60A5FA) else Color(0xFF2563EB), modifier = Modifier.size(16.dp).padding(top = 2.dp))
-                      Spacer(modifier = Modifier.width(8.dp))
-                      Column {
-                        Text(
-                          text = "Derinlik Tavsiyesi",
-                          style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = if (isDark) Color(0xFF93C5FD) else Color(0xFF1E40AF))
+                      Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                          imageVector = Icons.Default.Anchor,
+                          contentDescription = null,
+                          tint = when (recScope.status) {
+                            ChainRecommendationStatus.DEFICIENT -> Color(0xFFEF4444)
+                            ChainRecommendationStatus.OPTIMAL -> Color(0xFF10B981)
+                            ChainRecommendationStatus.EXCESSIVE -> Color(0xFF38BDF8)
+                          },
+                          modifier = Modifier.size(17.dp)
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                          text = recommendation,
-                          style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.5.sp, color = textSecondary)
+                          text = "HAVA & DERİNLİK KALOMA TAVSİYESİ",
+                          style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Black,
+                            fontSize = 10.sp,
+                            letterSpacing = 0.5.sp
+                          ),
+                          color = textPrimary
+                        )
+                      }
+
+                      Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = when (recScope.status) {
+                          ChainRecommendationStatus.DEFICIENT -> if (isDark) Color(0xFF7F1D1D) else Color(0xFFFEE2E2)
+                          ChainRecommendationStatus.OPTIMAL -> if (isDark) Color(0xFF064E3B) else Color(0xFFD1FAE5)
+                          ChainRecommendationStatus.EXCESSIVE -> if (isDark) Color(0xFF0C4A6E) else Color(0xFFE0F2FE)
+                        }
+                      ) {
+                        Text(
+                          text = when (recScope.status) {
+                            ChainRecommendationStatus.DEFICIENT -> "YETERSİZ ZİNCİR"
+                            ChainRecommendationStatus.OPTIMAL -> "İDEAL KALOMA"
+                            ChainRecommendationStatus.EXCESSIVE -> "GENİŞ KALOMA"
+                          },
+                          style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Black,
+                            fontSize = 8.5.sp,
+                            color = when (recScope.status) {
+                              ChainRecommendationStatus.DEFICIENT -> if (isDark) Color(0xFFFCA5A5) else Color(0xFF991B1B)
+                              ChainRecommendationStatus.OPTIMAL -> if (isDark) Color(0xFF6EE7B7) else Color(0xFF065F46)
+                              ChainRecommendationStatus.EXCESSIVE -> if (isDark) Color(0xFF7DD3FC) else Color(0xFF0369A1)
+                            }
+                          ),
+                          modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                       }
                     }
-                  }
-              }
 
-              // c: Loçadan Demir Yerine Olan Yatay Mesafe
-              Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = if (isDark) Color(0xFF0C192E) else Color(0xFFEFF6FF),
-                border = androidx.compose.foundation.BorderStroke(1.dp, if (isDark) Color(0xFF1E355B) else Color(0xFFBFDBFE)),
-                modifier = Modifier.fillMaxWidth()
-              ) {
-                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                  Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                  ) {
-                    Column {
-                      Text(
-                        text = "c = Loçadan Demir Yerine Yatay Mesafe",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.5.sp),
-                        color = textPrimary
-                      )
-                      Text(
-                        text = if (uiState.isAnchorAutoHorizontal) "Formül: c = √(a² - b²)" else "Manuel Giriş Aktif",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, color = textMuted)
-                      )
-                    }
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                      Text(
-                        text = if (uiState.isAnchorAutoHorizontal) "Otomatik (Pisagor)" else "Manuel",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                          fontWeight = FontWeight.Bold,
-                          fontSize = 9.sp,
-                          color = if (uiState.isAnchorAutoHorizontal) (if (isDark) Color(0xFF38BDF8) else PrimaryBlue) else Color(0xFFF59E0B)
-                        )
-                      )
-                      Spacer(modifier = Modifier.width(4.dp))
-                      Switch(
-                        checked = uiState.isAnchorAutoHorizontal,
-                        onCheckedChange = { viewModel.updateAnchorCalculation(isAutoHorizontal = it) },
-                        colors = SwitchDefaults.colors(
-                          checkedThumbColor = if (isDark) Color(0xFF38BDF8) else PrimaryBlue,
-                          checkedTrackColor = if (isDark) Color(0xFF1E3A8A) else Color(0xFFBFDBFE),
-                          uncheckedThumbColor = textMuted,
-                          uncheckedTrackColor = subtleBorder
-                        ),
-                        modifier = Modifier.height(24.dp)
-                      )
-                    }
-                  }
-
-                  if (uiState.isAnchorAutoHorizontal) {
+                    // 2. Deniz Hava Durumu Parametreleri Özeti
                     Surface(
                       shape = RoundedCornerShape(6.dp),
-                      color = if (isDark) Color(0xFF0F2445) else Color(0xFFDBEAFE),
-                      border = androidx.compose.foundation.BorderStroke(1.dp, if (isDark) Color(0xFF1D4ED8) else Color(0xFF93C5FD))
+                      color = if (isDark) Color(0xFF1E293B).copy(alpha = 0.6f) else Color.White,
+                      border = androidx.compose.foundation.BorderStroke(0.6.dp, subtleBorder)
                     ) {
                       Row(
                         modifier = Modifier
                           .fillMaxWidth()
-                          .padding(horizontal = 10.dp, vertical = 6.dp),
+                          .padding(horizontal = 8.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                       ) {
-                        Text(
-                          text = "c = √(a² - b²):",
-                          style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 9.5.sp),
-                          color = if (isDark) Color(0xFF93C5FD) else Color(0xFF1E40AF)
-                        )
-                        Text(
-                          text = "${String.format(Locale.US, "%.1f", result.c_horizontalDistanceMeters)} m (${String.format(Locale.US, "%.2f", result.c_horizontalDistanceGomina)} Gomina)",
-                          style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Black, color = if (isDark) Color(0xFF38BDF8) else PrimaryBlue)
-                        )
+                        // Derinlik
+                        Column {
+                          Text("Derinlik", style = MaterialTheme.typography.labelSmall.copy(fontSize = 7.5.sp, color = textSecondary))
+                          Text("${String.format(Locale.US, "%.1f", result.b_depthMeters)} m", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Black, color = if (isDark) MarineYellow else Color(0xFFD97706)))
+                        }
+                        // Rüzgar
+                        Column {
+                          Text("Rüzgar", style = MaterialTheme.typography.labelSmall.copy(fontSize = 7.5.sp, color = textSecondary))
+                          Text("${String.format(Locale.US, "%.0f", uiState.marineWeather.windSpeedKnots)} kn", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Black, color = textPrimary))
+                        }
+                        // Dalga
+                        Column {
+                          Text("Dalga", style = MaterialTheme.typography.labelSmall.copy(fontSize = 7.5.sp, color = textSecondary))
+                          Text("${String.format(Locale.US, "%.1f", uiState.marineWeather.waveHeightMeters)} m", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Black, color = textPrimary))
+                        }
+                        // Beaufort
+                        Column {
+                          Text("Beaufort", style = MaterialTheme.typography.labelSmall.copy(fontSize = 7.5.sp, color = textSecondary))
+                          Text("Bft ${uiState.marineWeather.beaufortScale}", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Black, color = if (isDark) MarineCyan else PrimaryBlue))
+                        }
+                        // Zemin
+                        Column {
+                          Text("Zemin", style = MaterialTheme.typography.labelSmall.copy(fontSize = 7.5.sp, color = textSecondary))
+                          Text(uiState.anchorBottomType.displayNameTr.take(8), style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Black, color = if (isDark) MarineCyan else PrimaryBlue))
+                        }
                       }
                     }
-                  } else {
-                    OutlinedTextField(
-                      value = uiState.anchorCustomHorizontalDistStr,
-                      onValueChange = { viewModel.updateAnchorCalculation(customHorizontal = it) },
-                      label = { Text("c = Özel Yatay Mesafe (Metre)") },
-                      placeholder = { Text(String.format(Locale.US, "%.1f", result.c_horizontalDistanceMeters)) },
-                      keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                      colors = anchorInputColors,
+
+                    // 3. Hava Durumu Senaryo Seçici (Canlı / Sakin / Orta / Sert / Fırtına)
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                      Text(
+                        text = "Hava Simülasyonu / Durumu:",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp, fontWeight = FontWeight.SemiBold, color = textSecondary)
+                      )
+                      Row(
+                        modifier = Modifier
+                          .fillMaxWidth()
+                          .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                      ) {
+                        AnchorWeatherScenario.values().forEach { scn ->
+                          val isSelected = uiState.anchorWeatherScenario == scn
+                          Surface(
+                            shape = RoundedCornerShape(5.dp),
+                            color = if (isSelected) (if (isDark) Color(0xFF1E3A8A) else PrimaryBlue) else (if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0)),
+                            border = androidx.compose.foundation.BorderStroke(
+                              0.8.dp,
+                              if (isSelected) (if (isDark) Color(0xFF60A5FA) else PrimaryBlue) else subtleBorder
+                            ),
+                            modifier = Modifier.clickable {
+                              viewModel.setAnchorWeatherScenario(scn)
+                            }
+                          ) {
+                            Text(
+                              text = when (scn) {
+                                AnchorWeatherScenario.LIVE -> "🛰️ Canlı Hava"
+                                AnchorWeatherScenario.CALM -> "🌤️ Sakin (<15kn)"
+                                AnchorWeatherScenario.MODERATE -> "🌊 Orta (20kn)"
+                                AnchorWeatherScenario.ROUGH -> "💨 Sert (30kn)"
+                                AnchorWeatherScenario.STORM -> "🌪️ Fırtına (42kn)"
+                              },
+                              style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold,
+                                fontSize = 8.5.sp,
+                                color = if (isSelected) Color.White else textPrimary
+                              ),
+                              modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                            )
+                          }
+                        }
+                      }
+                    }
+
+                    // 4. Ana Tavsiye Göstergesi (Öne Çıkan Kart)
+                    Surface(
                       shape = RoundedCornerShape(8.dp),
-                      modifier = Modifier.fillMaxWidth()
+                      color = if (isDark) Color(0xFF1E293B) else Color(0xFFEFF6FF),
+                      border = androidx.compose.foundation.BorderStroke(1.dp, if (isDark) Color(0xFF3B82F6) else Color(0xFF93C5FD))
+                    ) {
+                      Column(
+                        modifier = Modifier
+                          .fillMaxWidth()
+                          .padding(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                      ) {
+                        Row(
+                          modifier = Modifier.fillMaxWidth(),
+                          horizontalArrangement = Arrangement.SpaceBetween,
+                          verticalAlignment = Alignment.CenterVertically
+                        ) {
+                          Column {
+                            Text(
+                              text = "TAVSİYE EDİLEN ZİNCİR (KALOMA)",
+                              style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, fontWeight = FontWeight.Bold, color = textSecondary)
+                            )
+                            Row(verticalAlignment = Alignment.Bottom) {
+                              Text(
+                                text = "${String.format(Locale.US, "%.1f", recScope.recommendedShackles)} KİLİT",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                  fontWeight = FontWeight.Black,
+                                  fontSize = 15.sp,
+                                  color = if (isDark) Color(0xFF60A5FA) else Color(0xFF1D4ED8)
+                                )
+                              )
+                              Spacer(modifier = Modifier.width(6.dp))
+                              Text(
+                                text = "(${String.format(Locale.US, "%.1f", recScope.recommendedMeters)} m)",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                  fontWeight = FontWeight.Bold,
+                                  fontSize = 11.sp,
+                                  color = if (isDark) MarineYellow else Color(0xFFB45309)
+                                ),
+                                modifier = Modifier.padding(bottom = 1.dp)
+                              )
+                            }
+                          }
+
+                          Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                              text = "Güvenli Aralık: ${String.format(Locale.US, "%.1f", recScope.recommendedShacklesMin)}-${String.format(Locale.US, "%.1f", recScope.recommendedShacklesMax)} Klt",
+                              style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                            )
+                            Text(
+                              text = "Oran: ${String.format(Locale.US, "%.1f", recScope.recommendedScopeRatio)}x Derinlik",
+                              style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp, fontWeight = FontWeight.SemiBold, color = textSecondary)
+                            )
+                          }
+                        }
+
+                        // 5. Durum Detayı ve Karşılaştırma Uyarısı
+                        Text(
+                          text = recScope.recommendationDetailTr,
+                          style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 8.5.sp,
+                            lineHeight = 12.sp,
+                            color = textPrimary
+                          )
+                        )
+
+                        // 6. Tek Tıkla Uygulama Butonu (Mevcut kilit tavsiyeden farklıysa)
+                        if (kotlin.math.abs(result.a_chainScopeShackles - recScope.recommendedShackles) >= 0.2) {
+                          Spacer(modifier = Modifier.height(2.dp))
+                          Button(
+                            onClick = { viewModel.applyRecommendedChainScope() },
+                            colors = ButtonDefaults.buttonColors(
+                              containerColor = if (recScope.status == ChainRecommendationStatus.DEFICIENT) Color(0xFFDC2626) else PrimaryBlue
+                            ),
+                            shape = RoundedCornerShape(6.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            modifier = Modifier
+                              .fillMaxWidth()
+                              .height(30.dp)
+                              .testTag("btn_apply_recommended_shackles")
+                          ) {
+                            Icon(
+                              imageVector = Icons.Default.Check,
+                              contentDescription = null,
+                              tint = Color.White,
+                              modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                              text = "Tavsiye Edilen Kalomayı Uygula (${String.format(Locale.US, "%.1f", recScope.recommendedShackles)} Kilit / ${String.format(Locale.US, "%.0f", recScope.recommendedMeters)} m)",
+                              style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Black,
+                                fontSize = 9.sp,
+                                color = Color.White
+                              )
+                            )
+                          }
+                        }
+                      }
+                    }
+
+                    // Dip Kuralı Bilgi Notu
+                    Text(
+                      text = recScope.seamanshipRuleText,
+                      style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 7.5.sp,
+                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                        color = textMuted
+                      )
                     )
                   }
                 }
@@ -662,16 +855,16 @@ fun AnchorCalculationCard(
                 modifier = Modifier
                   .fillMaxWidth()
                   .clickable { showAdvancedInputs = !showAdvancedInputs }
-                  .padding(vertical = 4.dp),
+                  .padding(vertical = 2.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
               ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                  Icon(Icons.Default.DirectionsBoat, contentDescription = null, tint = if (isDark) Color(0xFF38BDF8) else PrimaryBlue, modifier = Modifier.size(16.dp))
-                  Spacer(modifier = Modifier.width(6.dp))
+                  Icon(Icons.Default.DirectionsBoat, contentDescription = null, tint = if (isDark) Color(0xFF38BDF8) else PrimaryBlue, modifier = Modifier.size(14.dp))
+                  Spacer(modifier = Modifier.width(4.dp))
                   Text(
                     text = "Gemi Mesafeleri (K/Ü-Loça: ${String.format(Locale.US, "%.0fm", result.distBridgeToHawseMeters)}, K/Ü-Kıç: ${String.format(Locale.US, "%.0fm", result.distBridgeToSternMeters)})",
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.5.sp),
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 8.5.sp),
                     color = if (isDark) Color(0xFF38BDF8) else PrimaryBlue
                   )
                 }
@@ -679,28 +872,29 @@ fun AnchorCalculationCard(
                   imageVector = if (showAdvancedInputs) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                   contentDescription = null,
                   tint = if (isDark) Color(0xFF38BDF8) else PrimaryBlue,
-                  modifier = Modifier.size(16.dp)
+                  modifier = Modifier.size(14.dp)
                 )
               }
 
               AnimatedVisibility(visible = showAdvancedInputs) {
                 Column(
                   modifier = Modifier.fillMaxWidth(),
-                  verticalArrangement = Arrangement.spacedBy(8.dp)
+                  verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                   Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                   ) {
                     // Köprüüstü -> Loça
                     OutlinedTextField(
                       value = uiState.anchorBridgeToHawseStr,
                       onValueChange = { viewModel.updateAnchorCalculation(bridgeToHawse = it) },
-                      label = { Text("Köprüüstü -> Loça") },
-                      placeholder = { Text("35.0 m") },
+                      label = { Text("Köprüüstü -> Loça", fontSize = 8.sp) },
+                      placeholder = { Text("35.0 m", fontSize = 8.sp) },
+                      textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
                       keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                       colors = anchorInputColors,
-                      shape = RoundedCornerShape(8.dp),
+                      shape = RoundedCornerShape(6.dp),
                       modifier = Modifier.weight(1f)
                     )
 
@@ -708,28 +902,30 @@ fun AnchorCalculationCard(
                     OutlinedTextField(
                       value = uiState.anchorBridgeToSternStr,
                       onValueChange = { viewModel.updateAnchorCalculation(bridgeToStern = it) },
-                      label = { Text("Köprüüstü -> Kıç") },
-                      placeholder = { Text("85.0 m") },
+                      label = { Text("Köprüüstü -> Kıç", fontSize = 8.sp) },
+                      placeholder = { Text("85.0 m", fontSize = 8.sp) },
+                      textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
                       keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                       colors = anchorInputColors,
-                      shape = RoundedCornerShape(8.dp),
+                      shape = RoundedCornerShape(6.dp),
                       modifier = Modifier.weight(1f)
                     )
                   }
 
                   Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                   ) {
                     // Gemi Tam Boyu (LOA)
                     OutlinedTextField(
                       value = uiState.anchorLoaStr,
                       onValueChange = { viewModel.updateAnchorCalculation(loa = it) },
-                      label = { Text("Gemi Boyu LOA") },
-                      placeholder = { Text("120.0 m") },
+                      label = { Text("Gemi Boyu LOA", fontSize = 8.sp) },
+                      placeholder = { Text("120.0 m", fontSize = 8.sp) },
+                      textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
                       keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                       colors = anchorInputColors,
-                      shape = RoundedCornerShape(8.dp),
+                      shape = RoundedCornerShape(6.dp),
                       modifier = Modifier.weight(1f)
                     )
 
@@ -737,43 +933,22 @@ fun AnchorCalculationCard(
                     OutlinedTextField(
                       value = uiState.anchorSafetyMarginStr,
                       onValueChange = { viewModel.updateAnchorCalculation(safetyMargin = it) },
-                      label = { Text("İlave Emniyet (m)") },
-                      placeholder = { Text("0.0 m") },
+                      label = { Text("İlave Emniyet (m)", fontSize = 8.sp) },
+                      placeholder = { Text("0.0 m", fontSize = 8.sp) },
+                      textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
                       keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                       colors = anchorInputColors,
-                      shape = RoundedCornerShape(8.dp),
+                      shape = RoundedCornerShape(6.dp),
                       modifier = Modifier.weight(1f)
                     )
                   }
                 }
               }
-            }
           }
 
           // ══════════════════════════════════════════════════════════════
-          // 6. EYLEM BUTONLARI (Geçmişe Kaydet / Haritaya Aktar / Demir At)
+          // 6. EYLEM BUTONLARI (Haritaya Aktar / Demir At / MOB)
           // ══════════════════════════════════════════════════════════════
-          Button(
-            onClick = {
-              viewModel.saveCurrentAnchorCalculation()
-            },
-            colors = ButtonDefaults.buttonColors(
-              containerColor = Color(0xFF0F766E),
-              contentColor = Color.White
-            ),
-            shape = RoundedCornerShape(8.dp),
-            modifier = Modifier
-              .fillMaxWidth()
-              .height(42.dp)
-              .testTag("btn_save_anchor_to_history")
-          ) {
-            Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(14.dp))
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-              "Demirleme mevkii (Kaydet)",
-              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp)
-            )
-          }
 
           Row(
             modifier = Modifier.fillMaxWidth(),
@@ -1068,7 +1243,7 @@ fun AnchorCalculationCard(
           // YAN KESİT VE KUŞBAKIŞI ŞEMALARI (CANVAS)
           // ══════════════════════════════════════════════════════════════
           Surface(
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(10.dp),
             color = if (isDark) Color(0xFF0F172A) else Color(0xFFF8FAFC),
             border = androidx.compose.foundation.BorderStroke(1.dp, if (isDark) Color(0xFF1E293B) else Color(0xFFCBD5E1)),
             modifier = Modifier.fillMaxWidth().testTag("card_anchor_diagram_schema")
@@ -1076,316 +1251,46 @@ fun AnchorCalculationCard(
             Column(
               modifier = Modifier
                 .fillMaxWidth()
-                .padding(10.dp),
-              verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(6.dp),
+              verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-              // Başlık
+              // Başlık: Demirleme Yan Profil Kesiti
               Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Start
               ) {
                 Icon(
-                  imageVector = if (activeDiagramTab == 0) Icons.Default.DirectionsBoat else Icons.Default.Radar,
+                  imageVector = Icons.Default.Straighten,
                   contentDescription = null,
-                  tint = if (isDark) MarineYellow else Color(0xFFD97706),
-                  modifier = Modifier.size(16.dp)
+                  tint = if (isDark) MarineCyan else PrimaryBlue,
+                  modifier = Modifier.size(14.dp)
                 )
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                  text = if (activeDiagramTab == 0) "Demirleme & Kaloma Yan Kesit Şeması" else "Salma Dairesi",
+                  text = "DEMİRLEME YAN PROFİL KESİTİ (PİSAGOR GEOMETRİSİ)",
                   style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp,
+                    fontSize = 10.sp,
                     color = if (isDark) Color.White else Color(0xFF0F172A)
                   )
                 )
               }
 
-              // Tab Değiştirici (2 Sekme: Yan Kesit, Kuşbakışı Radar)
-              Row(
-                modifier = Modifier
-                  .fillMaxWidth()
-                  .background(if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
-                  .padding(3.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-              ) {
-                Surface(
-                  shape = RoundedCornerShape(6.dp),
-                  color = if (activeDiagramTab == 0) PrimaryBlue else Color.Transparent,
-                  modifier = Modifier
-                    .weight(1f)
-                    .clickable { activeDiagramTab = 0 }
-                ) {
-                  Row(
-                    modifier = Modifier
-                      .fillMaxWidth()
-                      .padding(vertical = 5.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                  ) {
-                    Icon(
-                      imageVector = Icons.Default.DirectionsBoat,
-                      contentDescription = null,
-                      tint = if (activeDiagramTab == 0) Color.White else if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
-                      modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                      text = "Yan Kesit Şeması",
-                      style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 9.5.sp,
-                        fontWeight = if (activeDiagramTab == 0) FontWeight.Bold else FontWeight.Medium,
-                        color = if (activeDiagramTab == 0) Color.White else if (isDark) Color(0xFF94A3B8) else Color(0xFF334155)
-                      )
-                    )
-                  }
-                }
-                Surface(
-                  shape = RoundedCornerShape(6.dp),
-                  color = if (activeDiagramTab == 1) PrimaryBlue else Color.Transparent,
-                  modifier = Modifier
-                    .weight(1f)
-                    .clickable { activeDiagramTab = 1 }
-                ) {
-                  Row(
-                    modifier = Modifier
-                      .fillMaxWidth()
-                      .padding(vertical = 5.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                  ) {
-                    Icon(
-                      imageVector = Icons.Default.Map,
-                      contentDescription = null,
-                      tint = if (activeDiagramTab == 1) Color.White else if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
-                      modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                      text = "Salma Dairesi (Canlı Harita)",
-                      style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 9.5.sp,
-                        fontWeight = if (activeDiagramTab == 1) FontWeight.Bold else FontWeight.Medium,
-                        color = if (activeDiagramTab == 1) Color.White else if (isDark) Color(0xFF94A3B8) else Color(0xFF334155)
-                      )
-                    )
-                  }
-                }
-              }
-
-              // Diyagram Alanı
+              // Diyagram Alanı: Sadece Yan Profil
               Box(
                 modifier = Modifier
                   .fillMaxWidth()
-                  .height(240.dp)
-                  .background(if (isDark) Color(0xFF070D1E) else Color(0xFFF0F9FF), RoundedCornerShape(8.dp))
-                  .border(1.dp, if (isDark) Color(0xFF1E293B) else Color(0xFFBAE6FD), RoundedCornerShape(8.dp))
-                  .clip(RoundedCornerShape(8.dp))
+                  .height(180.dp)
+                  .background(if (isDark) Color(0xFF070D1E) else Color(0xFFF0F9FF), RoundedCornerShape(6.dp))
+                  .border(1.dp, if (isDark) Color(0xFF1E293B) else Color(0xFFBAE6FD), RoundedCornerShape(6.dp))
+                  .clip(RoundedCornerShape(6.dp))
               ) {
-                if (activeDiagramTab == 0) {
-                  SideProfileAnchorDiagram(result = result, isDark = isDark)
-                } else {
-                  AnchorSwingingCircleMap(
-                    uiState = uiState,
-                    result = result,
-                    isFullScreen = false,
-                    onToggleFullScreen = { isFullScreenMap = true }
-                  )
-                }
+                SideProfileAnchorDiagram(result = result, isDark = isDark)
               }
             }
           }
         }
-      }
-    }
-  }
-
-  if (isFullScreenMap) {
-    androidx.compose.ui.window.Dialog(
-      onDismissRequest = { isFullScreenMap = false },
-      properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-      Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-        AnchorSwingingCircleMap(
-          uiState = uiState,
-          result = result,
-          isFullScreen = true,
-          onToggleFullScreen = { isFullScreenMap = false }
-        )
-      }
-    }
-  }
-}
-
-@SuppressLint("SetJavaScriptEnabled")
-@Composable
-private fun AnchorSwingingCircleMap(
-  uiState: TideUiState,
-  result: AnchorCalculationResult,
-  isFullScreen: Boolean,
-  onToggleFullScreen: () -> Unit
-) {
-  // AIS Gerçek Harita Görünümü & Salma Dairesi
-  val mapLat = when {
-    uiState.mobEvent.isActive && uiState.mobEvent.latitude != 0.0 -> uiState.mobEvent.latitude
-    uiState.anchorEvent.isAnchored && uiState.anchorEvent.latitude != 0.0 -> uiState.anchorEvent.latitude
-    else -> com.example.model.LocationPresets.parseCoordinateOrDecimal(uiState.latStr) ?: 40.836
-  }
-  val mapLon = when {
-    uiState.mobEvent.isActive && uiState.mobEvent.longitude != 0.0 -> uiState.mobEvent.longitude
-    uiState.anchorEvent.isAnchored && uiState.anchorEvent.longitude != 0.0 -> uiState.anchorEvent.longitude
-    else -> com.example.model.LocationPresets.parseCoordinateOrDecimal(uiState.lonStr) ?: 29.301
-  }
-  val mtUrl = "https://www.marinetraffic.com/en/ais/home/centerx:${String.format(java.util.Locale.US, "%.4f", mapLon)}/centery:${String.format(java.util.Locale.US, "%.4f", mapLat)}/zoom:14"
-
-  var isMapLoading by remember { mutableStateOf(true) }
-  var mapLoadError by remember { mutableStateOf(false) }
-
-  Box(modifier = Modifier.fillMaxSize()) {
-    // 1. Gerçek AIS Canlı Haritası
-    AndroidView(
-      modifier = Modifier.fillMaxSize(),
-      factory = { ctx ->
-        WebView(ctx).apply {
-          setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null)
-          layoutParams = ViewGroup.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT
-          )
-          settings.apply {
-            javaScriptEnabled = true
-            domStorageEnabled = true
-            databaseEnabled = true
-            setSupportZoom(true)
-            builtInZoomControls = true
-            displayZoomControls = false
-            loadWithOverviewMode = true
-            useWideViewPort = true
-            cacheMode = WebSettings.LOAD_DEFAULT
-            loadsImagesAutomatically = true
-            userAgentString = "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 MarineNav/1.0"
-          }
-          webViewClient = object : WebViewClient() {
-            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-              super.onPageStarted(view, url, favicon)
-              isMapLoading = true
-              mapLoadError = false
-            }
-
-            override fun onPageFinished(view: WebView?, url: String?) {
-              super.onPageFinished(view, url)
-              isMapLoading = false
-
-              if (uiState.isDarkMode) {
-                view?.evaluateJavascript(
-                  """
-                  (function() {
-                    var style = document.createElement('style');
-                    style.innerHTML = 'html { filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(85%); background: #121212 !important; } iframe, img, canvas { filter: invert(100%) hue-rotate(180deg) !important; }';
-                    document.head.appendChild(style);
-                  })();
-                  """.trimIndent(),
-                  null
-                )
-              }
-              
-              view?.evaluateJavascript(com.example.engine.MapOverlayInjector.getInjectableJavascript(uiState), null)
-            }
-
-            override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
-              super.onReceivedError(view, request, error)
-              if (request?.isForMainFrame == true) {
-                isMapLoading = false
-                mapLoadError = true
-              }
-            }
-          }
-          loadUrl(mtUrl)
-        }
-      },
-      update = { wv ->
-        if (wv.url == null) {
-          wv.loadUrl(mtUrl)
-        }
-      }
-    )
-
-    // Harita yüklenirken veya hata durumunda yedek deniz haritası arkaplanı
-    if (mapLoadError) {
-      Image(
-        painter = painterResource(id = R.drawable.map_screenshot_1788370170131),
-        contentDescription = "Map Fallback",
-        contentScale = ContentScale.Crop,
-        modifier = Modifier.fillMaxSize().alpha(0.7f)
-      )
-      // Sadece hata durumunda statik radar çizimini göster
-      TopDownRadarDiagram(result = result, uiState = uiState, isDark = uiState.isDarkMode)
-    }
-
-    // Yükleme Göstergesi
-    if (isMapLoading) {
-      LinearProgressIndicator(
-        modifier = Modifier.fillMaxWidth().height(3.dp).align(Alignment.TopCenter),
-        color = MarineYellow,
-        trackColor = Color(0xFF0F172A).copy(alpha = 0.3f)
-      )
-    }
-
-    // Canlı AIS Rozeti & Tam Ekran Butonu
-    Row(
-      modifier = Modifier
-        .align(Alignment.TopEnd)
-        .padding(6.dp),
-      horizontalArrangement = Arrangement.spacedBy(4.dp),
-      verticalAlignment = Alignment.CenterVertically
-    ) {
-      Surface(
-        shape = RoundedCornerShape(4.dp),
-        color = Color(0xFF0F172A).copy(alpha = 0.85f),
-        border = androidx.compose.foundation.BorderStroke(0.6.dp, MarineCyan.copy(alpha = 0.5f))
-      ) {
-        Row(
-          modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
-          verticalAlignment = Alignment.CenterVertically
-        ) {
-          Box(
-            modifier = Modifier
-              .size(6.dp)
-              .background(Color(0xFF10B981), CircleShape)
-          )
-          Spacer(modifier = Modifier.width(4.dp))
-          Text(
-            text = "AIS Canlı",
-            style = MaterialTheme.typography.labelSmall.copy(
-              fontSize = 8.sp,
-              fontWeight = FontWeight.Bold,
-              color = Color(0xFFE2E8F0)
-            )
-          )
-        }
-      }
-
-      Surface(
-        shape = RoundedCornerShape(4.dp),
-        color = PrimaryBlue.copy(alpha = 0.9f),
-        modifier = Modifier.clickable { onToggleFullScreen() }
-      ) {
-        Row(
-          modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-          verticalAlignment = Alignment.CenterVertically
-        ) {
-          Icon(if (isFullScreen) Icons.Default.CloseFullscreen else Icons.Default.OpenInFull, contentDescription = "Tam Ekran", tint = Color.White, modifier = Modifier.size(11.dp))
-          Spacer(modifier = Modifier.width(3.dp))
-          Text(
-            text = if (isFullScreen) "Küçült" else "Tam Harita",
-            style = MaterialTheme.typography.labelSmall.copy(
-              fontSize = 8.sp,
-              fontWeight = FontWeight.Bold,
-              color = Color.White
-            )
-          )
-        }
-      }
     }
   }
 }
@@ -1580,133 +1485,6 @@ private fun SideProfileAnchorDiagram(
       // I. ve II. Salma Özet Notu
       drawText("1. Salma: c+d = ${String.format(Locale.US, "%.1fm", result.d_firstSwingingCircleMeters)}", 20f, h - 12f, bluePaint)
       drawText("2. Salma: c+LOA = ${String.format(Locale.US, "%.1fm", result.f_secondSwingingCircleMeters)}", w - 240f, h - 12f, yellowPaint)
-    }
-  }
-}
-
-/**
- * Kuşbakışı Radar Salma Dairesi Çizimi
- */
-@Composable
-private fun TopDownRadarDiagram(
-  result: AnchorCalculationResult,
-  uiState: TideUiState,
-  isDark: Boolean = true
-) {
-  val vesselHeading = uiState.headingDegreesStr.toDoubleOrNull() ?: 45.0
-  val vesselSpeed = uiState.speedStr.toDoubleOrNull() ?: 0.0
-
-  Canvas(modifier = Modifier.fillMaxSize()) {
-    val center = Offset(size.width / 2f, size.height / 2f + 10f)
-    val maxDim = kotlin.math.min(size.width, size.height)
-    val maxRadiusMeters = kotlin.math.max(result.f_secondSwingingCircleMeters * 1.28, 50.0)
-    val scale = (maxDim / 2f * 0.78f) / maxRadiusMeters.toFloat()
-
-    val r1 = (result.d_firstSwingingCircleMeters.toFloat() * scale).coerceAtLeast(18f)
-    val r2 = (result.f_secondSwingingCircleMeters.toFloat() * scale).coerceAtLeast(r1 + 12f)
-
-    // Arka plan
-    drawRect(color = if (isDark) Color(0xFF070D1E) else Color(0xFFF0F9FF))
-
-    // Grid ve pusula kerteriz halkaları
-    val ringColor1 = if (isDark) Color(0xFF1E293B) else Color(0xFFCBD5E1)
-    val ringColor2 = if (isDark) Color(0xFF334155) else Color(0xFF94A3B8)
-    drawCircle(color = ringColor1, radius = r2 * 1.15f, center = center, style = Stroke(width = 1f))
-    drawCircle(color = ringColor2, radius = r2 * 1.15f, center = center, style = Stroke(width = 1f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f))))
-
-    // Pusula Ana Yönleri
-    val compassRad = r2 * 1.15f
-    drawLine(color = ringColor2, start = Offset(center.x, center.y - compassRad), end = Offset(center.x, center.y + compassRad), strokeWidth = 1f)
-    drawLine(color = ringColor2, start = Offset(center.x - compassRad, center.y), end = Offset(center.x + compassRad, center.y), strokeWidth = 1f)
-
-    // 2. Salma Dairesi (f - Dış Emniyet Çemberi, Kırmızı)
-    val circle2Color = if (isDark) Color(0xFFEF4444) else Color(0xFFDC2626)
-    drawCircle(color = circle2Color.copy(alpha = if (isDark) 0.25f else 0.15f), radius = r2, center = center)
-    drawCircle(color = circle2Color, radius = r2, center = center, style = Stroke(width = 4f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(20f, 10f))))
-
-    // 1. Salma Dairesi (d - Köprüüstü/Radar Gözlem Çemberi, Turuncu)
-    val circle1Color = if (isDark) Color(0xFFF59E0B) else Color(0xFFD97706)
-    drawCircle(color = circle1Color.copy(alpha = if (isDark) 0.20f else 0.12f), radius = r1, center = center)
-    drawCircle(color = circle1Color, radius = r1, center = center, style = Stroke(width = 3.5f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(15f, 8f))))
-
-    // Demirleme Noktası (Merkez)
-    drawCircle(color = if (isDark) Color.White else Color(0xFF0F172A), radius = 6f, center = center)
-    drawCircle(color = if (isDark) Color(0xFF0284C7) else Color(0xFF0369A1), radius = 4f, center = center)
-
-    // Gemi Konumu (Pruva ve Salma yönüne göre)
-    val angleRad = Math.toRadians(vesselHeading)
-    val cosA = cos(angleRad).toFloat()
-    val sinA = sin(angleRad).toFloat()
-
-    val cPix = (result.c_horizontalDistanceMeters.toFloat() * scale).coerceAtLeast(12f)
-    val hawsePos = Offset(center.x + sinA * cPix, center.y - cosA * cPix)
-
-    // Zincir hattı (Demir -> Loça)
-    drawLine(
-      color = if (isDark) MarineYellow else Color(0xFFB45309),
-      start = center,
-      end = hawsePos,
-      strokeWidth = 2.5f,
-      pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 3f))
-    )
-
-    // Gemi Gövdesi (Loça -> Köprüüstü -> Kıç)
-    val bowHawseToBridge = (result.distBridgeToHawseMeters.toFloat() * scale).coerceAtLeast(6f)
-    val bridgePos = Offset(hawsePos.x - sinA * bowHawseToBridge, hawsePos.y + cosA * bowHawseToBridge)
-
-    val bridgeToStern = (result.distBridgeToSternMeters.toFloat() * scale).coerceAtLeast(6f)
-    val sternPos = Offset(bridgePos.x - sinA * bridgeToStern, bridgePos.y + cosA * bridgeToStern)
-
-    // Gemi silueti gövdesi
-    val shipLineDark = if (isDark) Color(0xFF0284C7) else Color(0xFF0369A1)
-    val shipLineBright = if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7)
-    drawLine(color = shipLineDark, start = hawsePos, end = sternPos, strokeWidth = 6f)
-    drawLine(color = shipLineBright, start = hawsePos, end = sternPos, strokeWidth = 3f)
-
-    drawCircle(color = if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7), radius = 4.5f, center = hawsePos) // Loça
-    drawCircle(color = if (isDark) MarineYellow else Color(0xFFD97706), radius = 5f, center = bridgePos) // Köprüüstü
-    drawCircle(color = Color(0xFFEF4444), radius = 4f, center = sternPos) // Kıç
-
-    val yellowPaint = android.graphics.Paint().apply {
-      isAntiAlias = true
-      textSize = 21f
-      color = if (isDark) android.graphics.Color.parseColor("#FDE047") else android.graphics.Color.parseColor("#92400E")
-      typeface = android.graphics.Typeface.DEFAULT_BOLD
-    }
-    val cyanPaint = android.graphics.Paint().apply {
-      isAntiAlias = true
-      textSize = 21f
-      color = if (isDark) android.graphics.Color.parseColor("#38BDF8") else android.graphics.Color.parseColor("#0284C7")
-      typeface = android.graphics.Typeface.DEFAULT_BOLD
-    }
-    val infoPaint = android.graphics.Paint().apply {
-      isAntiAlias = true
-      textSize = 19f
-      color = if (isDark) android.graphics.Color.parseColor("#94A3B8") else android.graphics.Color.parseColor("#475569")
-    }
-
-    drawContext.canvas.nativeCanvas.apply {
-      // Üst Bilgi Başlığı
-      val vName = uiState.vesselName.ifBlank { uiState.selectedVessel.name }
-      drawText(
-        "$vName | Pruva: ${String.format(Locale.US, "%.0f°", vesselHeading)} | Sürat: ${String.format(Locale.US, "%.1f kn", vesselSpeed)}",
-        16f,
-        24f,
-        infoPaint
-      )
-      // Alt Salma Etiketleri
-      drawText(
-        "I. Salma (d=${String.format(Locale.US, "%.0fm", result.d_firstSwingingCircleMeters)})",
-        16f,
-        size.height - 10f,
-        cyanPaint
-      )
-      drawText(
-        "II. Salma (f=${String.format(Locale.US, "%.0fm", result.f_secondSwingingCircleMeters)})",
-        size.width - 240f,
-        size.height - 10f,
-        yellowPaint
-      )
     }
   }
 }

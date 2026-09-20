@@ -1,8 +1,10 @@
 package com.example.engine
 
 import com.example.model.*
+import java.util.Locale
 import kotlin.math.max
 import kotlin.math.pow
+import kotlin.math.round
 import kotlin.math.sqrt
 
 /**
@@ -74,6 +76,17 @@ object AnchorCalculationEngine {
 
     val metersPerShackle = params.shackleStandard.metersPerShackle
 
+    val recommendedScope = calculateRecommendedChainScope(
+      depthMeters = b,
+      currentChainMeters = a,
+      metersPerShackle = metersPerShackle,
+      bottomType = params.bottomType,
+      windSpeedKnots = params.windSpeedKnots,
+      waveHeightMeters = params.waveHeightMeters,
+      beaufortScale = params.beaufortScale,
+      seaStateDescription = params.seaStateDescription
+    )
+
     return AnchorCalculationResult(
       a_chainScopeMeters = a,
       a_chainScopeShackles = a / metersPerShackle,
@@ -110,7 +123,147 @@ object AnchorCalculationEngine {
       distBridgeToSternMeters = distBridgeToStern,
       loaMeters = loa,
       safetyMarginMeters = safetyMargin,
-      isChainShorterThanDepth = isChainShorterThanDepth
+      isChainShorterThanDepth = isChainShorterThanDepth,
+      recommendedChainScope = recommendedScope
+    )
+  }
+
+  /**
+   * Girilen derinlik, zincir uzunluğu, hava ve deniz durumu parametrelerine göre
+   * ideal kaloma ve tavsiye edilen kilit sayısını hesaplar.
+   */
+  fun calculateRecommendedChainScope(
+    depthMeters: Double,
+    currentChainMeters: Double,
+    metersPerShackle: Double,
+    bottomType: AnchorBottomType = AnchorBottomType.MUD_SAND,
+    windSpeedKnots: Double = 12.0,
+    waveHeightMeters: Double = 0.5,
+    beaufortScale: Int = 3,
+    seaStateDescription: String = "Sakin"
+  ): RecommendedChainScope {
+    val d = max(1.0, depthMeters)
+    val a = max(1.0, currentChainMeters)
+    val currentShackles = a / metersPerShackle
+
+    // 1. Deniz ve Hava Durumu Şiddet Seviyesi
+    val weatherSeverity = when {
+      windSpeedKnots >= 34.0 || waveHeightMeters >= 2.5 || beaufortScale >= 8 -> WeatherSeverityLevel.STORM
+      windSpeedKnots >= 22.0 || waveHeightMeters >= 1.4 || beaufortScale >= 6 -> WeatherSeverityLevel.ROUGH
+      windSpeedKnots >= 14.0 || waveHeightMeters >= 0.7 || beaufortScale >= 4 -> WeatherSeverityLevel.MODERATE
+      else -> WeatherSeverityLevel.CALM
+    }
+
+    // 2. Derinlik Oranı (Sığ sularda kedi bükümü/catenary için yüksek katsayı gerekir)
+    val baseDepthRatio = when {
+      d <= 12.0 -> 5.5
+      d <= 25.0 -> 4.8
+      d <= 40.0 -> 4.2
+      d <= 60.0 -> 3.6
+      else -> 3.0
+    }
+
+    // 3. Hava ve Dalga Çarpanı
+    val weatherMultiplier = when (weatherSeverity) {
+      WeatherSeverityLevel.CALM -> 1.0
+      WeatherSeverityLevel.MODERATE -> 1.22
+      WeatherSeverityLevel.ROUGH -> 1.50
+      WeatherSeverityLevel.STORM -> 1.85
+    }
+
+    // 4. Zemin Tutma Katsayısı
+    val bottomMultiplier = when (bottomType) {
+      AnchorBottomType.MUD_SAND -> 1.0
+      AnchorBottomType.HARD_SAND -> 1.05
+      AnchorBottomType.SOFT_MUD -> 1.15
+      AnchorBottomType.GRAVEL_SHELL -> 1.25
+      AnchorBottomType.ROCK_CORAL -> 1.40
+    }
+
+    // 5. Asgari Güvenli Kilit Kuralı (Donanma/Ticari Standart: Kedi eğrisi için en az 3 kilit şarttır)
+    val minSafeShacklesCount = when (weatherSeverity) {
+      WeatherSeverityLevel.CALM -> 3.0
+      WeatherSeverityLevel.MODERATE -> 3.5
+      WeatherSeverityLevel.ROUGH -> 4.5
+      WeatherSeverityLevel.STORM -> 5.5
+    }
+    val minSafeMeters = minSafeShacklesCount * metersPerShackle
+
+    val calcMeters = d * baseDepthRatio * weatherMultiplier * bottomMultiplier
+    val targetMeters = max(calcMeters, minSafeMeters)
+
+    // Kilit sayısını en yakın buçuklu veya tam kilite yuvarla (Örn: 4.0, 4.5, 5.0, 5.5 vb.)
+    val rawShackles = targetMeters / metersPerShackle
+    val roundedShackles = round(rawShackles * 2.0) / 2.0
+    val recommendedShackles = max(minSafeShacklesCount, roundedShackles)
+    val recommendedMeters = recommendedShackles * metersPerShackle
+
+    val recMinShackles = max(3.0, recommendedShackles - 0.5)
+    val recMaxShackles = recommendedShackles + 1.0
+    val heavyWeatherShackles = max(recommendedShackles + 1.5, round((d * 7.0 / metersPerShackle) * 2.0) / 2.0)
+
+    val currentScopeRatio = a / d
+    val recommendedScopeRatio = recommendedMeters / d
+
+    // 6. Mevcut Zincir ile Fark
+    val diffShackles = currentShackles - recommendedShackles
+    val diffMeters = a - recommendedMeters
+
+    val status = when {
+      diffShackles < -0.4 -> ChainRecommendationStatus.DEFICIENT
+      diffShackles > 1.6 -> ChainRecommendationStatus.EXCESSIVE
+      else -> ChainRecommendationStatus.OPTIMAL
+    }
+
+    val weatherSummaryTr = "Rüzgar: ${String.format(Locale.US, "%.1f", windSpeedKnots)} kn • Dalga: ${String.format(Locale.US, "%.1f", waveHeightMeters)} m (Bft $beaufortScale - ${weatherSeverity.labelTr})"
+
+    val headingText = when (status) {
+      ChainRecommendationStatus.DEFICIENT -> {
+        val neededSh = -diffShackles
+        val neededM = -diffMeters
+        "⚠️ ${String.format(Locale.US, "%.1f", neededSh)} Kilit (${String.format(Locale.US, "%.0f", neededM)}m) İlave Kaloma Veriniz"
+      }
+      ChainRecommendationStatus.OPTIMAL -> {
+        "✅ ${String.format(Locale.US, "%.1f", recommendedShackles)} Kilit Kaloma İdeal ve Emniyetli"
+      }
+      ChainRecommendationStatus.EXCESSIVE -> {
+        "ℹ️ ${String.format(Locale.US, "%.1f", currentShackles)} Kilit Kaloma Geniş (Güçlü Tutuş)"
+      }
+    }
+
+    val detailText = when (status) {
+      ChainRecommendationStatus.DEFICIENT -> {
+        val neededSh = -diffShackles
+        val neededM = -diffMeters
+        "Mevcut ${String.format(Locale.US, "%.1f", currentShackles)} kilit (${String.format(Locale.US, "%.1f", a)}m) kaloma; ${String.format(Locale.US, "%.1f", d)}m derinlik, ${String.format(Locale.US, "%.1f", windSpeedKnots)} kn rüzgar ve ${String.format(Locale.US, "%.1f", waveHeightMeters)}m dalga için yetersizdir. Zincir ağırlığı kedi eğrisini koruyamaz ve demir tarayabilir. Emniyet için ${String.format(Locale.US, "%.1f", neededSh)} kilit (${String.format(Locale.US, "%.0f", neededM)}m) daha kaloma verilerek en az ${String.format(Locale.US, "%.1f", recommendedShackles)} kilite (${String.format(Locale.US, "%.1f", recommendedMeters)}m) ulaşılmalıdır."
+      }
+      ChainRecommendationStatus.OPTIMAL -> {
+        "Girilen ${String.format(Locale.US, "%.1f", currentShackles)} kilit (${String.format(Locale.US, "%.1f", a)}m) zincir; ${String.format(Locale.US, "%.1f", d)}m derinlik ve deniz şartlarında (${String.format(Locale.US, "%.1f", windSpeedKnots)} kn rüzgar, ${String.format(Locale.US, "%.1f", waveHeightMeters)}m dalga) dipte ideal kedi eğrisi (catenary) sağlar. Demir bedeni yatay çekilir."
+      }
+      ChainRecommendationStatus.EXCESSIVE -> {
+        "Döşenen ${String.format(Locale.US, "%.1f", currentShackles)} kilit zincir, tavsiye edilen ${String.format(Locale.US, "%.1f", recommendedShackles)} kilitten fazladır (+${String.format(Locale.US, "%.1f", diffShackles)} kilit). Tutuş son derece güvenlidir; ancak salma dairesi genişler. Çevre gemilere ve sığlıklara dikkat ediniz."
+      }
+    }
+
+    val ruleText = "Kural: Donanma & Ticari Kaloma Standardı (${String.format(Locale.US, "%.1f", recommendedScopeRatio)}x Derinlik + Dalga/Rüzgar Payı)"
+
+    return RecommendedChainScope(
+      recommendedShackles = recommendedShackles,
+      recommendedShacklesMin = recMinShackles,
+      recommendedShacklesMax = recMaxShackles,
+      recommendedMeters = recommendedMeters,
+      minSafeShackles = minSafeShacklesCount,
+      heavyWeatherShackles = heavyWeatherShackles,
+      scopeRatio = currentScopeRatio,
+      recommendedScopeRatio = recommendedScopeRatio,
+      weatherSeverity = weatherSeverity,
+      weatherSummaryTr = weatherSummaryTr,
+      status = status,
+      differenceShackles = diffShackles,
+      differenceMeters = diffMeters,
+      recommendationHeading = headingText,
+      recommendationDetailTr = detailText,
+      seamanshipRuleText = ruleText
     )
   }
 

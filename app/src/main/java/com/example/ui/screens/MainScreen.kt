@@ -115,7 +115,28 @@ fun MainScreen(
             modifier = Modifier.testTag("rail_tab_home")
           )
 
-          // 2. AIS & KOORDİNATLAR
+          // 2. DENİZ & HAVA DURUMU
+          NavigationRailItem(
+            selected = uiState.selectedTabIndex == 3,
+            onClick = { viewModel.setTab(3) },
+            icon = {
+              Icon(
+                imageVector = if (uiState.selectedTabIndex == 3) Icons.Filled.Air else Icons.Outlined.Air,
+                contentDescription = "Hava Durumu"
+              )
+            },
+            label = {
+              Text(
+                "Hava",
+                fontSize = 9.sp,
+                fontWeight = if (uiState.selectedTabIndex == 3) FontWeight.ExtraBold else FontWeight.Medium
+              )
+            },
+            colors = railItemColors(),
+            modifier = Modifier.testTag("rail_tab_weather")
+          )
+
+          // 3. AIS & KOORDİNATLAR
           NavigationRailItem(
             selected = uiState.selectedTabIndex == 5,
             onClick = { viewModel.setTab(5) },
@@ -236,6 +257,38 @@ fun MainScreen(
             modifier = Modifier.testTag("rail_tab_map")
           )
 
+          // 6. OTOMATİK TXT LOG KAYDI
+          NavigationRailItem(
+            selected = uiState.selectedTabIndex == 6,
+            onClick = { viewModel.setTab(6) },
+            icon = {
+              BadgedBox(
+                badge = {
+                  Badge(
+                    containerColor = SeaGreen,
+                    contentColor = Color.White
+                  ) {
+                    Text("30m", fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                  }
+                }
+              ) {
+                Icon(
+                  imageVector = if (uiState.selectedTabIndex == 6) Icons.Filled.Save else Icons.Outlined.Save,
+                  contentDescription = "Kaydet"
+                )
+              }
+            },
+            label = {
+              Text(
+                "Kaydet",
+                fontSize = 9.sp,
+                fontWeight = if (uiState.selectedTabIndex == 6) FontWeight.ExtraBold else FontWeight.Medium
+              )
+            },
+            colors = railItemColors(),
+            modifier = Modifier.testTag("rail_tab_txt_log")
+          )
+
           // 6. GECE / GÜNDÜZ MODU SEKMESİ (Sadece sembol)
           NavigationRailItem(
             selected = false,
@@ -320,7 +373,23 @@ fun MainScreen(
               modifier = Modifier.testTag("tab_home")
             )
 
-            // 2. AIS & KOORDİNATLAR
+            // 2. DENİZ & HAVA DURUMU
+            NavigationBarItem(
+              selected = uiState.selectedTabIndex == 3,
+              onClick = { viewModel.setTab(3) },
+              icon = {
+                Icon(
+                  imageVector = if (uiState.selectedTabIndex == 3) Icons.Filled.Air else Icons.Outlined.Air,
+                  contentDescription = "Hava Durumu",
+                  modifier = Modifier.size(20.dp)
+                )
+              },
+              alwaysShowLabel = false,
+              colors = navItemColors(uiState.isDarkMode),
+              modifier = Modifier.testTag("tab_weather")
+            )
+
+            // 3. AIS & KOORDİNATLAR
             NavigationBarItem(
               selected = uiState.selectedTabIndex == 5,
               onClick = { viewModel.setTab(5) },
@@ -402,22 +471,6 @@ fun MainScreen(
               modifier = Modifier.testTag("tab_tide")
             )
 
-            // 5. DENİZ & HAVA DURUMU
-            NavigationBarItem(
-              selected = uiState.selectedTabIndex == 3,
-              onClick = { viewModel.setTab(3) },
-              icon = {
-                Icon(
-                  imageVector = if (uiState.selectedTabIndex == 3) Icons.Filled.Air else Icons.Outlined.Air,
-                  contentDescription = "Hava Durumu",
-                  modifier = Modifier.size(20.dp)
-                )
-              },
-              alwaysShowLabel = false,
-              colors = navItemColors(uiState.isDarkMode),
-              modifier = Modifier.testTag("tab_weather")
-            )
-
             // 6. CANLI HARİTA (Canlı AIS Haritası)
             NavigationBarItem(
               selected = uiState.selectedTabIndex == 4,
@@ -431,6 +484,32 @@ fun MainScreen(
               },
               colors = navItemColors(uiState.isDarkMode),
               modifier = Modifier.testTag("tab_map")
+            )
+
+            // 7. OTOMATİK TXT LOG KAYDI
+            NavigationBarItem(
+              selected = uiState.selectedTabIndex == 6,
+              onClick = { viewModel.setTab(6) },
+              icon = {
+                BadgedBox(
+                  badge = {
+                    Badge(
+                      containerColor = SeaGreen,
+                      contentColor = Color.White
+                    ) {
+                      Text("30m", fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                    }
+                  }
+                ) {
+                  Icon(
+                    imageVector = if (uiState.selectedTabIndex == 6) Icons.Filled.Save else Icons.Outlined.Save,
+                    contentDescription = "Kaydet",
+                    modifier = Modifier.size(20.dp)
+                  )
+                }
+              },
+              colors = navItemColors(uiState.isDarkMode),
+              modifier = Modifier.testTag("tab_txt_log")
             )
 
             // 6. GECE / GÜNDÜZ AYAR SEKMESİ (Sadece sembol)
@@ -509,6 +588,10 @@ private fun MainContentArea(
         viewModel = viewModel
       )
       4 -> MarineMapView(
+        uiState = uiState,
+        viewModel = viewModel
+      )
+      6 -> com.example.ui.screens.TxtLogManagerView(
         uiState = uiState,
         viewModel = viewModel
       )

@@ -11,7 +11,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -20,8 +19,12 @@ import androidx.compose.ui.unit.sp
 import com.example.model.NavigationAnalysis
 import com.example.ui.theme.*
 
+/**
+ * Anlık Su Derinliği Hesaplaması Kartı
+ * Harita Derinliği (CD) + Anlık Gelgit = Anlık Toplam Su Derinliği ve Net UKC Güvenlik Durumu.
+ */
 @Composable
-fun BridgeTelemetryCard(
+fun InstantWaterDepthCard(
   analysis: NavigationAnalysis,
   isDarkMode: Boolean = false,
   onOpenAisMap: (() -> Unit)? = null,
@@ -35,16 +38,16 @@ fun BridgeTelemetryCard(
   val textMuted = getMarineTextMuted(isDarkMode)
 
   Card(
-    shape = RoundedCornerShape(12.dp),
+    shape = RoundedCornerShape(10.dp),
     colors = CardDefaults.cardColors(containerColor = cardBg),
     border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryBlue.copy(alpha = 0.6f)),
     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     modifier = modifier
       .fillMaxWidth()
-      .testTag("bridge_telemetry_card")
+      .testTag("instant_depth_calculation_card")
   ) {
-    Column(modifier = Modifier.padding(10.dp)) {
-      // Başlık
+    Column(modifier = Modifier.padding(8.dp)) {
+      // Başlık & Güvenlik Rozeti
       Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -57,70 +60,75 @@ fun BridgeTelemetryCard(
           Surface(
             shape = CircleShape,
             color = if (isDarkMode) PrimaryBlueLight else Color(0xFFDBEAFE),
-            modifier = Modifier.size(28.dp)
+            modifier = Modifier.size(24.dp)
           ) {
             Box(contentAlignment = Alignment.Center) {
               Icon(
-                Icons.Default.Explore,
-                contentDescription = "Anlık Durum",
+                Icons.Default.Water,
+                contentDescription = "Anlık Su Derinliği",
                 tint = if (isDarkMode) MarineCyan else PrimaryBlueDark,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(14.dp)
               )
             }
           }
-          Spacer(modifier = Modifier.width(8.dp))
+          Spacer(modifier = Modifier.width(6.dp))
           Column {
             Text(
-              text = "Anlık durum",
-              style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-              color = textPrimary,
-              softWrap = true
+              text = "ANLIK SU DERİNLİĞİ HESAPLAMASI",
+              style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Black, fontSize = 10.5.sp),
+              color = if (isDarkMode) MarineCyan else PrimaryBlueDark
             )
             Text(
-              text = "${analysis.vessel.name} • Dinamik Derinlik & UKC",
-              style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-              color = textMuted,
-              softWrap = true
+              text = "${analysis.vessel.name.ifBlank { "Gemi" }} • Harita (CD) + Gelgit = Toplam Derinlik",
+              style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+              color = textMuted
             )
           }
         }
 
-        if (onOpenAisMap != null) {
-          FilledTonalButton(
-            onClick = onOpenAisMap,
-            shape = RoundedCornerShape(6.dp),
-            colors = ButtonDefaults.filledTonalButtonColors(
-              containerColor = if (isDarkMode) PrimaryBlueLight else Color(0xFFDBEAFE),
-              contentColor = if (isDarkMode) MarineCyan else PrimaryBlueDark
-            ),
-            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
-            modifier = Modifier.height(28.dp).testTag("btn_bridge_open_map")
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          if (onOpenAisMap != null) {
+            FilledTonalButton(
+              onClick = onOpenAisMap,
+              shape = RoundedCornerShape(6.dp),
+              colors = ButtonDefaults.filledTonalButtonColors(
+                containerColor = if (isDarkMode) PrimaryBlueLight else Color(0xFFDBEAFE),
+                contentColor = if (isDarkMode) MarineCyan else PrimaryBlueDark
+              ),
+              contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+              modifier = Modifier.height(26.dp).padding(end = 4.dp).testTag("btn_instant_depth_map")
+            ) {
+              Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(11.dp))
+              Spacer(modifier = Modifier.width(2.dp))
+              Text("Harita", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.5.sp))
+            }
+          }
+
+          Surface(
+            shape = RoundedCornerShape(4.dp),
+            color = if (analysis.isCurrentlySafe) (if (isDarkMode) SeaGreenLight else Color(0xFFD1FAE5)) else (if (isDarkMode) DangerRedLight else Color(0xFFFEE2E2)),
+            border = androidx.compose.foundation.BorderStroke(1.dp, if (analysis.isCurrentlySafe) SeaGreenBorder else DangerRedBorder)
           ) {
-            Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(12.dp))
-            Spacer(modifier = Modifier.width(3.dp))
-            Text("Harita", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp))
+            Text(
+              text = if (analysis.isCurrentlySafe) "GÜVENLİ" else "YETERSİZ",
+              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 9.sp),
+              color = if (analysis.isCurrentlySafe) (if (isDarkMode) SeaGreen else Color(0xFF059669)) else DangerRed,
+              modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+            )
           }
         }
       }
 
-      Spacer(modifier = Modifier.height(8.dp))
+      Spacer(modifier = Modifier.height(6.dp))
 
-      // 1. ANA DERİNLİK HESAP BÖLÜMÜ (Mevki Harita Derinliği + Gelgit = Anlık Toplam Derinlik)
+      // Hesaplama Kutusu: Harita Derinliği (CD) + Gelgit = Anlık Toplam Derinlik
       Surface(
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(8.dp),
         color = subtleBg,
-        border = androidx.compose.foundation.BorderStroke(1.dp, if (isDarkMode) MarineCyan.copy(alpha = 0.3f) else PrimaryBlue.copy(alpha = 0.2f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (isDarkMode) MarineCyan.copy(alpha = 0.25f) else PrimaryBlue.copy(alpha = 0.15f)),
         modifier = Modifier.fillMaxWidth()
       ) {
         Column(modifier = Modifier.padding(8.dp)) {
-          Text(
-            text = "ANLIK SU DERİNLİĞİ HESAPLAMASI",
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 9.sp),
-            color = if (isDarkMode) MarineCyan else PrimaryBlueDark
-          )
-
-          Spacer(modifier = Modifier.height(6.dp))
-
           Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -184,10 +192,10 @@ fun BridgeTelemetryCard(
           }
 
           Spacer(modifier = Modifier.height(6.dp))
-          Divider(color = cardBorder, thickness = 1.dp)
+          HorizontalDivider(color = cardBorder, thickness = 0.8.dp)
           Spacer(modifier = Modifier.height(6.dp))
 
-          // Anlık Net UKC Durumu
+          // Net UKC Durumu ve Draft Karşılaştırması
           Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -214,18 +222,11 @@ fun BridgeTelemetryCard(
               )
             }
 
-            Surface(
-              shape = RoundedCornerShape(4.dp),
-              color = if (analysis.isCurrentlySafe) (if (isDarkMode) SeaGreenLight else Color(0xFFD1FAE5)) else (if (isDarkMode) DangerRedLight else Color(0xFFFEE2E2)),
-              border = androidx.compose.foundation.BorderStroke(1.dp, if (analysis.isCurrentlySafe) SeaGreenBorder else DangerRedBorder)
-            ) {
-              Text(
-                text = if (analysis.isCurrentlySafe) "GÜVENLİ" else "YETERSİZ",
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 9.sp),
-                color = if (analysis.isCurrentlySafe) (if (isDarkMode) SeaGreen else Color(0xFF059669)) else DangerRed,
-                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-              )
-            }
+            Text(
+              text = "Draft: ${analysis.vessel.draftMeters} m",
+              style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+              color = textMuted
+            )
           }
         }
       }
@@ -233,3 +234,20 @@ fun BridgeTelemetryCard(
   }
 }
 
+/**
+ * Geriye uyumluluk için BridgeTelemetryCard artık doğrudan Anlık Su Derinliği Kartı olarak hizmet verir.
+ */
+@Composable
+fun BridgeTelemetryCard(
+  analysis: NavigationAnalysis,
+  isDarkMode: Boolean = false,
+  onOpenAisMap: (() -> Unit)? = null,
+  modifier: Modifier = Modifier
+) {
+  InstantWaterDepthCard(
+    analysis = analysis,
+    isDarkMode = isDarkMode,
+    onOpenAisMap = onOpenAisMap,
+    modifier = modifier
+  )
+}

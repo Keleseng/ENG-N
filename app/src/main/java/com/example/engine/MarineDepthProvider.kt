@@ -48,10 +48,11 @@ object MarineDepthProvider {
         .header("Accept", "application/json")
         .build()
 
-      val response = httpClient.newCall(request).execute()
-      val jsonStr = response.body?.string()
+      val jsonStr = httpClient.newCall(request).execute().use { response ->
+        if (response.isSuccessful) response.body?.string() else null
+      }
 
-      if (response.isSuccessful && !jsonStr.isNullOrBlank() && jsonStr.startsWith("{")) {
+      if (!jsonStr.isNullOrBlank() && jsonStr.startsWith("{")) {
         val json = JSONObject(jsonStr)
         val hasAvg = json.has("avg") && !json.isNull("avg")
         val hasSmoothed = json.has("smoothed") && !json.isNull("smoothed")
@@ -98,10 +99,11 @@ object MarineDepthProvider {
         .header("User-Agent", "MarineDepthProvider/1.0")
         .build()
 
-      val response = httpClient.newCall(request).execute()
-      val jsonStr = response.body?.string()
+      val jsonStr = httpClient.newCall(request).execute().use { response ->
+        if (response.isSuccessful) response.body?.string() else null
+      }
 
-      if (response.isSuccessful && !jsonStr.isNullOrBlank()) {
+      if (!jsonStr.isNullOrBlank()) {
         val json = JSONObject(jsonStr)
         val status = json.optString("status", "")
         if (status.equals("OK", ignoreCase = true)) {
@@ -140,7 +142,7 @@ object MarineDepthProvider {
     return@withContext fallback
   }
 
-  private fun calculateRegionalDepthFallback(lat: Double, lon: Double): MarineDepthResult {
+  fun calculateRegionalDepthFallback(lat: Double, lon: Double): MarineDepthResult {
     val nearest = com.example.model.LocationPresets.strategicMarineLocations.minByOrNull { port ->
       com.example.model.calculateHaversineDistanceNm(lat, lon, port.latitude, port.longitude)
     }

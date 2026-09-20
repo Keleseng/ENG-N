@@ -13,17 +13,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.example.location.GpsLocationProvider
 import com.example.ui.TideNavViewModel
 import com.example.ui.screens.MainScreen
-import com.example.ui.screens.SplashScreen
 import com.example.ui.theme.MyApplicationTheme
-import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
   private val viewModel: TideNavViewModel by viewModels()

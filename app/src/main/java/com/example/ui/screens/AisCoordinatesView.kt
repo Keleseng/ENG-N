@@ -32,6 +32,7 @@ import com.example.model.AisVesselData
 import com.example.model.LocationPresets
 import com.example.ui.TideNavViewModel
 import com.example.ui.TideUiState
+import com.example.ui.components.AisRadarFullScreenDialog
 import com.example.ui.theme.*
 import java.util.Locale
 
@@ -127,6 +128,31 @@ fun AisCoordinatesView(
           }
         }
       }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // 0. CANLI AIS RADARI (TAM EKRAN PPI RADAR BUTONU)
+    // ══════════════════════════════════════════════════════════════════════
+    Button(
+      onClick = { viewModel.openAisRadar() },
+      colors = ButtonDefaults.buttonColors(
+        containerColor = if (isDark) PrimaryBlueDark else PrimaryBlue,
+        contentColor = Color.White
+      ),
+      shape = RoundedCornerShape(8.dp),
+      modifier = Modifier
+        .fillMaxWidth()
+        .height(48.dp)
+        .testTag("btn_open_ais_radar")
+    ) {
+      Icon(Icons.Default.TrackChanges, contentDescription = null, modifier = Modifier.size(18.dp))
+      Spacer(modifier = Modifier.width(8.dp))
+      Text(
+        "AIS RADARI",
+        fontWeight = FontWeight.Black,
+        fontSize = 14.sp,
+        letterSpacing = 0.5.sp
+      )
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -422,16 +448,16 @@ fun AisCoordinatesView(
             ),
             border = androidx.compose.foundation.BorderStroke(1.dp, cardBorder),
             shape = RoundedCornerShape(6.dp),
-            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
-            modifier = Modifier.weight(1.3f).height(34.dp)
+            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp),
+            modifier = Modifier.weight(1f).height(34.dp).testTag("btn_fetch_verified_depth")
           ) {
             if (uiState.isDepthLoading) {
               CircularProgressIndicator(modifier = Modifier.size(12.dp), color = MarineYellow, strokeWidth = 2.dp)
             } else {
               Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(12.dp), tint = if (isDark) MarineCyan else PrimaryBlue)
             }
-            Spacer(modifier = Modifier.width(4.dp))
-            Text("DERİNLİK BUL", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.width(3.dp))
+            Text("DERİNLİK BUL", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, maxLines = 1)
           }
         }
       }
@@ -588,6 +614,61 @@ fun AisCoordinatesView(
             }
           }
         }
+
+        // 5. Satır: AIS Mevkii Deniz Derinliği (GPS Koordinatları Batimetrisi)
+        Surface(shape = RoundedCornerShape(5.dp), color = subtleBg, modifier = Modifier.fillMaxWidth()) {
+          Row(
+            modifier = Modifier.padding(6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+              Icon(
+                imageVector = Icons.Default.Waves,
+                contentDescription = null,
+                tint = if (isDark) MarineCyan else PrimaryBlue,
+                modifier = Modifier.size(15.dp)
+              )
+              Spacer(modifier = Modifier.width(6.dp))
+              Column {
+                Text(
+                  "AIS Mevkii Deniz Derinliği (GPS Batimetri)",
+                  fontSize = 8.5.sp,
+                  fontWeight = FontWeight.Bold,
+                  color = textSecondary
+                )
+                val depthDisplay = uiState.verifiedMarineDepth?.let {
+                  "${String.format(Locale.US, "%.1f", it.depthMeters)} m • ${it.confidenceText}"
+                } ?: "${uiState.chartedDepthStr} m"
+                Text(
+                  depthDisplay,
+                  fontWeight = FontWeight.Black,
+                  fontSize = 10.5.sp,
+                  color = if (isDark) MarineCyan else PrimaryBlueDark
+                )
+              }
+            }
+            if (uiState.isDepthLoading) {
+              CircularProgressIndicator(
+                modifier = Modifier.size(13.dp),
+                color = MarineYellow,
+                strokeWidth = 1.8.dp
+              )
+            } else {
+              IconButton(
+                onClick = { viewModel.fetchVerifiedDepth(aisVessel.latitude, aisVessel.longitude) },
+                modifier = Modifier.size(22.dp)
+              ) {
+                Icon(
+                  imageVector = Icons.Default.Refresh,
+                  contentDescription = "Derinliği Yenile",
+                  tint = if (isDark) MarineCyan else PrimaryBlue,
+                  modifier = Modifier.size(14.dp)
+                )
+              }
+            }
+          }
+        }
       }
     }
 
@@ -595,5 +676,17 @@ fun AisCoordinatesView(
     // 5. AIS & DENİZCİLİK HABERLEŞME REHBERİ (KALDIRILDI)
     // ══════════════════════════════════════════════════════════════════════
     Spacer(modifier = Modifier.height(10.dp))
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // TAM EKRAN CANLI AIS RADARI DİYALOĞU
+  // ══════════════════════════════════════════════════════════════════════
+  if (uiState.isAisRadarOpen) {
+    AisRadarFullScreenDialog(
+      uiState = uiState,
+      viewModel = viewModel,
+      onDismiss = { viewModel.closeAisRadar() },
+      onNavigateToMap = onNavigateToMap
+    )
   }
 }

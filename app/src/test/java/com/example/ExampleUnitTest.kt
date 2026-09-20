@@ -84,4 +84,37 @@ class ExampleUnitTest {
     assertTrue("Bearing degrees should be valid (0..359)", golcukPort.bearingDegrees in 0..359)
     assertTrue("ETA formatting should be populated", golcukPort.estimatedTimeFormatted.isNotEmpty())
   }
+
+  @Test
+  fun testAnchorChainRecommendationCalmVsStorm() {
+    // Derinlik 40m, Mevcut zincir 5 kilit (137.5m), Kilit 27.5m
+    val calmRec = com.example.engine.AnchorCalculationEngine.calculateRecommendedChainScope(
+      depthMeters = 40.0,
+      currentChainMeters = 137.5,
+      metersPerShackle = 27.5,
+      bottomType = com.example.model.AnchorBottomType.MUD_SAND,
+      windSpeedKnots = 10.0,
+      waveHeightMeters = 0.4,
+      beaufortScale = 3
+    )
+    assertNotNull(calmRec)
+    assertEquals(com.example.model.WeatherSeverityLevel.CALM, calmRec.weatherSeverity)
+    assertTrue("Tavsiye edilen kilit sayısı asgari güvenli kilit sayısından (3.0) büyük veya eşit olmalı", calmRec.recommendedShackles >= 3.0)
+
+    // Ağır fırtına şartları (38 kn rüzgar, 3.0m dalga)
+    val stormRec = com.example.engine.AnchorCalculationEngine.calculateRecommendedChainScope(
+      depthMeters = 40.0,
+      currentChainMeters = 137.5,
+      metersPerShackle = 27.5,
+      bottomType = com.example.model.AnchorBottomType.MUD_SAND,
+      windSpeedKnots = 38.0,
+      waveHeightMeters = 3.0,
+      beaufortScale = 8
+    )
+    assertNotNull(stormRec)
+    assertEquals(com.example.model.WeatherSeverityLevel.STORM, stormRec.weatherSeverity)
+    assertTrue("Fırtınada tavsiye edilen kilit sakin havadakinden fazla olmalı", stormRec.recommendedShackles > calmRec.recommendedShackles)
+    assertEquals(com.example.model.ChainRecommendationStatus.DEFICIENT, stormRec.status)
+    assertTrue(stormRec.recommendationHeading.contains("İlave Kaloma Veriniz"))
+  }
 }

@@ -365,7 +365,171 @@ object LocationPresets {
       }
       return num
     }
-    return clean.replace(',', '.').toDoubleOrNull()
+    val direct = clean.replace(',', '.').toDoubleOrNull()
+    if (direct != null && abs(direct) <= 180.0) {
+      return direct
+    }
+    // Rakam serisi (örn 405012 veya 0291805) kontrolü
+    val parsed = parseAndFormatCoordinate(clean, isLatitude = true).first
+    if (parsed != null) return parsed
+    return parseAndFormatCoordinate(clean, isLatitude = false).first
+  }
+
+  /**
+   * Sayısal girişleri (örn: 410049, 41 00 49, 41.00.49, 41.0136, 41 00.817)
+   * otomatik olarak standart Denizci GPS formatına (DD°MM'SS"K / DDD°MM'SS"D) çevirir ve (Double?, FormattedString?) döner.
+   * Enlem için: ilk 2 sayı derece, sonraki 2 sayı dakika, sonraki 2 sayı saniye (2-2-2).
+   * Boylam için: ilk 3 sayı derece, sonraki 2 sayı dakika, sonraki 2 sayı saniye (3-2-2).
+   */
+  fun parseAndFormatCoordinate(input: String?, isLatitude: Boolean): Pair<Double?, String?> {
+    if (input.isNullOrBlank()) return Pair(null, null)
+    val clean = input.trim()
+      .replace('”', '"')
+      .replace('“', '"')
+      .replace('’', '\'')
+      .replace('‘', '\'')
+      .replace('′', '\'')
+      .replace('″', '"')
+      .replace("''", "\"")
+      .replace(',', '.')
+
+    val upper = clean.uppercase()
+    val isSouthOrWest = upper.contains("G") || upper.contains("S") || upper.contains("B") || upper.contains("W") || clean.startsWith("-")
+    val defaultDir = if (isLatitude) {
+      if (isSouthOrWest) "G" else "K"
+    } else {
+      if (isSouthOrWest) "B" else "D"
+    }
+
+    val numPart = clean.replace(Regex("""[KkGgDdBbNnSsEeWw\-\+]"""), "").trim()
+    if (numPart.isBlank()) return Pair(null, null)
+
+    // 1. Standart DMS formatı (örn: 41°00'49"K veya 41° 00' 49")
+    val dmsRegex = Regex("""(\d+)[\s°dD]+(\d+)[\s'′]+([\d.]+)[\s"″]*""")
+    val dmsMatch = dmsRegex.find(numPart)
+    if (dmsMatch != null) {
+      val deg = dmsMatch.groupValues[1].toIntOrNull() ?: 0
+      val min = dmsMatch.groupValues[2].toIntOrNull() ?: 0
+      val sec = dmsMatch.groupValues[3].toDoubleOrNull() ?: 0.0
+      val secInt = kotlin.math.round(sec).toInt()
+      var dec = deg + (min / 60.0) + (sec / 3600.0)
+      if (isSouthOrWest) dec = -abs(dec)
+      val formatted = if (isLatitude) {
+        String.format(Locale.US, "%02d°%02d'%02d\"%s", deg, min, secInt, defaultDir)
+      } else {
+        String.format(Locale.US, "%03d°%02d'%02d\"%s", deg, min, secInt, defaultDir)
+      }
+      return Pair(dec, formatted)
+    }
+
+    // 2. DDM formatı (Derece ve ondalık dakika, örn: 41° 00.817' veya 41 00.817)
+    val ddmRegex = Regex("""(\d+)[\s°dD]+([\d.]+)[\s'′]*""")
+    val ddmMatch = ddmRegex.find(numPart)
+    if (ddmMatch != null && (numPart.contains("°") || numPart.contains("'") || numPart.contains(" "))) {
+      val deg = ddmMatch.groupValues[1].toIntOrNull() ?: 0
+      val minDec = ddmMatch.groupValues[2].toDoubleOrNull() ?: 0.0
+      val minInt = minDec.toInt()
+      val sec = kotlin.math.round((minDec - minInt) * 60.0).toInt()
+      var dec = deg + (minDec / 60.0)
+      if (isSouthOrWest) dec = -abs(dec)
+      val formatted = if (isLatitude) {
+        String.format(Locale.US, "%02d°%02d'%02d\"%s", deg, minInt, sec, defaultDir)
+      } else {
+        String.format(Locale.US, "%03d°%02d'%02d\"%s", deg, minInt, sec, defaultDir)
+      }
+      return Pair(dec, formatted)
+    }
+
+    // 3. Boşluk, nokta, tire veya iki nokta ile ayrılmış sayılar (örn: 41 00 49 veya 41.00.49 veya 41:00:49)
+    val parts = numPart.split(Regex("""[\s:;/\-_]+""")).filter { it.isNotBlank() }
+    val dotParts = if (parts.size == 1 && numPart.count { it == '.' } > 1) {
+      numPart.split('.').filter { it.isNotBlank() }
+    } else parts
+
+    if (dotParts.size >= 2) {
+      val pNums = dotParts.mapNotNull { it.toDoubleOrNull() }
+      if (pNums.size >= 3) {
+        val deg = pNums[0].toInt()
+        val min = pNums[1].toInt()
+        val sec = kotlin.math.round(pNums[2]).toInt()
+        var dec = deg + (min / 60.0) + (sec / 3600.0)
+        if (isSouthOrWest) dec = -abs(dec)
+        val formatted = if (isLatitude) {
+          String.format(Locale.US, "%02d°%02d'%02d\"%s", deg, min, sec, defaultDir)
+        } else {
+          String.format(Locale.US, "%03d°%02d'%02d\"%s", deg, min, sec, defaultDir)
+        }
+        return Pair(dec, formatted)
+      } else if (pNums.size == 2) {
+        val deg = pNums[0].toInt()
+        val minDec = pNums[1]
+        val minInt = minDec.toInt()
+        val sec = kotlin.math.round((minDec - minInt) * 60.0).toInt()
+        var dec = deg + (minDec / 60.0)
+        if (isSouthOrWest) dec = -abs(dec)
+        val formatted = if (isLatitude) {
+          String.format(Locale.US, "%02d°%02d'%02d\"%s", deg, minInt, sec, defaultDir)
+        } else {
+          String.format(Locale.US, "%03d°%02d'%02d\"%s", deg, minInt, sec, defaultDir)
+        }
+        return Pair(dec, formatted)
+      }
+    }
+
+    // 4. Bitişik Saf Rakamlar:
+    // Enlem: ilk 2 sayı derece, sonraki 2 sayı dakika, sonraki 2 sayı saniye (2-2-2)
+    // Boylam: ilk 3 sayı derece, sonraki 2 sayı dakika, sonraki 2 sayı saniye (3-2-2)
+    val digits = numPart.filter { it.isDigit() }
+    if (!numPart.contains('.')) {
+      if (isLatitude && digits.length in 2..6) {
+        val deg = digits.take(2).toIntOrNull() ?: 0
+        val min = if (digits.length >= 4) digits.substring(2, 4).toIntOrNull() ?: 0
+                  else if (digits.length == 3) digits.substring(2, 3).toIntOrNull() ?: 0
+                  else 0
+        val sec = if (digits.length >= 6) digits.substring(4, 6).toIntOrNull() ?: 0
+                  else if (digits.length == 5) digits.substring(4, 5).toIntOrNull() ?: 0
+                  else 0
+        var dec = deg + (min / 60.0) + (sec / 3600.0)
+        if (isSouthOrWest) dec = -abs(dec)
+        val formatted = String.format(Locale.US, "%02d°%02d'%02d\"%s", deg, min, sec, defaultDir)
+        return Pair(dec, formatted)
+      } else if (!isLatitude && digits.length in 2..7) {
+        // Boylam: ilk 3 hane derece (örn 029 veya 120), 6 hane girilmiş ve ilk 3 hane > 180 ise (örn 285833) başına 0 eklenir (0285833)
+        val cleanLonDigits = if (digits.length == 6 && (digits.take(3).toIntOrNull() ?: 0) > 180) "0$digits" else digits
+        val deg = if (cleanLonDigits.length >= 3) cleanLonDigits.take(3).toIntOrNull() ?: 0 else cleanLonDigits.toIntOrNull() ?: 0
+        val min = if (cleanLonDigits.length >= 5) cleanLonDigits.substring(3, 5).toIntOrNull() ?: 0
+                  else if (cleanLonDigits.length == 4) cleanLonDigits.substring(3, 4).toIntOrNull() ?: 0
+                  else 0
+        val sec = if (cleanLonDigits.length >= 7) cleanLonDigits.substring(5, 7).toIntOrNull() ?: 0
+                  else if (cleanLonDigits.length == 6) cleanLonDigits.substring(5, 6).toIntOrNull() ?: 0
+                  else 0
+        var dec = deg + (min / 60.0) + (sec / 3600.0)
+        if (isSouthOrWest) dec = -abs(dec)
+        val formatted = String.format(Locale.US, "%03d°%02d'%02d\"%s", deg, min, sec, defaultDir)
+        return Pair(dec, formatted)
+      }
+    }
+
+    // 5. Standart Ondalık Derece (Örn: 41.0136 veya 28.9758)
+    val decVal = numPart.toDoubleOrNull()
+    if (decVal != null) {
+      val absVal = abs(decVal)
+      if ((isLatitude && absVal <= 90.0) || (!isLatitude && absVal <= 180.0)) {
+        val deg = absVal.toInt()
+        val remMin = (absVal - deg) * 60.0
+        val minInt = remMin.toInt()
+        val sec = kotlin.math.round((remMin - minInt) * 60.0).toInt()
+        val dec = if (isSouthOrWest) -absVal else absVal
+        val formatted = if (isLatitude) {
+          String.format(Locale.US, "%02d°%02d'%02d\"%s", deg, minInt, sec, defaultDir)
+        } else {
+          String.format(Locale.US, "%03d°%02d'%02d\"%s", deg, minInt, sec, defaultDir)
+        }
+        return Pair(dec, formatted)
+      }
+    }
+
+    return Pair(null, null)
   }
 
   fun formatMarineLatitude(lat: Double): String {
