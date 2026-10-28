@@ -155,10 +155,21 @@ fun AisRadarFullScreenDialog(
           <head>
             <meta charset="utf-8" />
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
             <style>
               html, body, #map { width: 100%; height: 100%; margin: 0; padding: 0; background: #0b132b; }
+              .leaflet-control-attribution,
+              .leaflet-control-attribution a,
+              .leaflet-attribution-flag,
+              .leaflet-bottom.leaflet-right {
+                display: none !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
+                height: 0 !important;
+                width: 0 !important;
+              }
             </style>
           </head>
           <body>
@@ -214,7 +225,15 @@ fun AisRadarFullScreenDialog(
             factory = { ctx ->
               android.webkit.WebView(ctx).apply {
                 settings.javaScriptEnabled = true
-                webViewClient = android.webkit.WebViewClient()
+                webViewClient = object : android.webkit.WebViewClient() {
+                  override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    view?.evaluateJavascript(
+                      com.example.engine.MapOverlayInjector.getInjectableJavascript(uiState),
+                      null
+                    )
+                  }
+                }
                 webViewRef = this
               }
             },
@@ -309,7 +328,15 @@ fun AisRadarFullScreenDialog(
             factory = { ctx ->
               android.webkit.WebView(ctx).apply {
                 settings.javaScriptEnabled = true
-                webViewClient = android.webkit.WebViewClient()
+                webViewClient = object : android.webkit.WebViewClient() {
+                  override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    view?.evaluateJavascript(
+                      com.example.engine.MapOverlayInjector.getInjectableJavascript(uiState),
+                      null
+                    )
+                  }
+                }
                 webViewRef = this
               }
             },

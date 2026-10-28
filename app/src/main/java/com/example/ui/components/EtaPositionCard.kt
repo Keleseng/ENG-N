@@ -539,7 +539,7 @@ fun EtaPositionCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
               ) {
-                // Sol Taraf: Koordinatlar & Hedef
+                // Sol Taraf: Koordinatlar & Hedef & Deniz Rotası Dönüş Noktaları
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                   Text(
                     text = if (!receipt.targetName.isNullOrBlank() && receipt.targetName != "Varış Mevkii") "VARIŞ: ${receipt.targetName}" else "VARIŞ MEVKİİ",
@@ -556,6 +556,22 @@ fun EtaPositionCard(
                     color = textSecondary,
                     lineHeight = 14.sp
                   )
+                  if (receipt.isSeaRoute && receipt.waypoints.isNotEmpty()) {
+                    Text(
+                      text = "DENİZ ROTASI: ${receipt.waypoints.size} DÖNÜŞ NOKTASI",
+                      fontFamily = FontFamily.Monospace,
+                      fontWeight = FontWeight.Bold,
+                      fontSize = 8.5.sp,
+                      color = if (isDarkMode) Color(0xFF38BDF8) else PrimaryBlue
+                    )
+                    Text(
+                      text = receipt.waypoints.joinToString(" ➔ ") { it.id },
+                      fontFamily = FontFamily.Monospace,
+                      fontWeight = FontWeight.SemiBold,
+                      fontSize = 8.5.sp,
+                      color = if (isDarkMode) MarineYellow else Color(0xFFD97706)
+                    )
+                  }
                 }
 
                 // Sağ Taraf: Detaylar (Mesafe, Kerteriz, Sürat, ETA)
@@ -564,7 +580,7 @@ fun EtaPositionCard(
                   horizontalAlignment = Alignment.End
                 ) {
                   Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("MESAFE", fontFamily = FontFamily.Monospace, fontSize = 9.sp, fontWeight = FontWeight.Medium, color = textSecondary)
+                    Text(if (receipt.isSeaRoute) "DENİZ MESAFESİ" else "MESAFE", fontFamily = FontFamily.Monospace, fontSize = 9.sp, fontWeight = FontWeight.Medium, color = textSecondary)
                     Text("${String.format(Locale.US, "%.1f", receipt.distanceNm)} NM", fontFamily = FontFamily.Monospace, fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = if (isDarkMode) Color.White else Color.Black)
                   }
                   Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

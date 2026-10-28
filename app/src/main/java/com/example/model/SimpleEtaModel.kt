@@ -65,7 +65,10 @@ data class EtaSummaryReceipt(
   val bearingDegrees: Int,
   val speedKnots: Double,
   val etaTime: String,
-  val fullEtaDate: String = ""
+  val fullEtaDate: String = "",
+  val isSeaRoute: Boolean = false,
+  val waypoints: List<com.example.engine.MarineWaypoint> = emptyList(),
+  val routeSummaryText: String = ""
 )
 
 data class SimpleEtaResult(
@@ -77,7 +80,9 @@ data class SimpleEtaResult(
   val bearingDegrees: Int = 0,
   val latDms: String = "",
   val lonDms: String = "",
-  val etaTimeOnly: String = ""
+  val etaTimeOnly: String = "",
+  val isSeaRoute: Boolean = false,
+  val waypointsCount: Int = 0
 )
 
 object TurkishPorts {
@@ -315,23 +320,17 @@ fun calculateSimpleEta(
   speed: Double,
   dest: SimpleDestination
 ): SimpleEtaResult {
-  val dist = com.example.model.calculateHaversineDistanceNm(startLat, startLon, dest.lat, dest.lon)
-  val bearing = com.example.model.LocationPresets.calculateBearingDegrees(startLat, startLon, dest.lat, dest.lon)
-  val isDefaultSpeed = speed < 0.1
-  val safeSpeed = if (isDefaultSpeed) 12.0 else speed
+  val safeSpeed = if (speed <= 0.0) 10.0 else speed
+  val seaRoute = com.example.engine.MarineSeaRoutingEngine.calculateSeaRoute(
+    originLat = startLat,
+    originLon = startLon,
+    destLat = dest.lat,
+    destLon = dest.lon,
+    speedKnots = safeSpeed,
+    targetName = dest.name
+  )
 
-  val totalHours = dist / safeSpeed
-  val totalMins = (totalHours * 60).roundToInt()
-  val hrs = totalMins / 60
-  val mins = totalMins % 60
-  val durStr = if (isDefaultSpeed) "${hrs}sa ${mins}dk (12 kn)" else "${hrs}sa ${mins}dk"
-
-  val etaMillis = System.currentTimeMillis() + (totalMins * 60L * 1000L)
-  val sdf = SimpleDateFormat("dd MMM, HH:mm", Locale("tr"))
-  val timeOnlySdf = SimpleDateFormat("HH:mm", Locale.US)
-  val etaStr = sdf.format(Date(etaMillis))
-  val timeOnlyStr = timeOnlySdf.format(Date(etaMillis))
-
+  val bearing = seaRoute.initialBearingDegrees
   val latParts = decimalToDmsParts(dest.lat, true)
   val lonParts = decimalToDmsParts(dest.lon, false)
   val latDms = "${latParts.degrees}°${latParts.minutes}'${latParts.seconds}\"${latParts.direction}"
@@ -339,14 +338,16 @@ fun calculateSimpleEta(
 
   return SimpleEtaResult(
     destinationName = dest.name,
-    distanceNm = Math.round(dist * 10.0) / 10.0,
-    speedKnots = Math.round(safeSpeed * 10.0) / 10.0,
-    durationStr = durStr,
-    etaStr = etaStr,
+    distanceNm = seaRoute.totalDistanceNm,
+    speedKnots = seaRoute.speedKnots,
+    durationStr = seaRoute.durationStr,
+    etaStr = seaRoute.fullEtaDateStr,
     bearingDegrees = bearing,
     latDms = latDms,
     lonDms = lonDms,
-    etaTimeOnly = timeOnlyStr
+    etaTimeOnly = seaRoute.etaTimeStr,
+    isSeaRoute = seaRoute.isSeaRouteWithWaypoints,
+    waypointsCount = seaRoute.waypoints.size
   )
 }
 
@@ -357,32 +358,39 @@ fun computeEtaSummary(
   targetCoord: Coordinate,
   targetName: String? = null
 ): EtaSummaryReceipt {
-  val dist = com.example.model.calculateHaversineDistanceNm(startLat, startLon, targetCoord.latitude, targetCoord.longitude)
-  val bearing = com.example.model.LocationPresets.calculateBearingDegrees(startLat, startLon, targetCoord.latitude, targetCoord.longitude)
-  val safeSpeed = if (speedKnots < 0.5) 12.0 else speedKnots
+  val safeSpeed = if (speedKnots <= 0.0) 10.0 else speedKnots
+  val seaRoute = com.example.engine.MarineSeaRoutingEngine.calculateSeaRoute(
+    originLat = startLat,
+    originLon = startLon,
+    destLat = targetCoord.latitude,
+    destLon = targetCoord.longitude,
+    speedKnots = safeSpeed,
+    targetName = targetName
+  )
 
-  val totalHours = dist / safeSpeed
-  val totalMins = (totalHours * 60).roundToInt()
-
-  val etaMillis = System.currentTimeMillis() + (totalMins * 60L * 1000L)
-  val timeSdf = SimpleDateFormat("HH:mm", Locale.US)
-  val fullDateSdf = SimpleDateFormat("dd MMM, HH:mm", Locale("tr"))
-  val etaTimeStr = timeSdf.format(Date(etaMillis))
-  val fullDateStr = fullDateSdf.format(Date(etaMillis))
-
+  val bearing = seaRoute.initialBearingDegrees
   val latParts = decimalToDmsParts(targetCoord.latitude, true)
   val lonParts = decimalToDmsParts(targetCoord.longitude, false)
   val latDms = "${latParts.degrees}°${latParts.minutes}'${latParts.seconds}\"${latParts.direction}"
   val lonDms = "${lonParts.degrees}°${lonParts.minutes}'${lonParts.seconds}\"${lonParts.direction}"
 
+  val summaryText = if (seaRoute.isSeaRouteWithWaypoints && seaRoute.waypoints.isNotEmpty()) {
+    "Deniz Rotası (${seaRoute.waypoints.size} Dönüş Noktası: ${seaRoute.waypoints.joinToString(" ➔ ") { it.id }})"
+  } else {
+    "Açık Deniz Seyri"
+  }
+
   return EtaSummaryReceipt(
     targetName = targetName,
     latDms = latDms,
     lonDms = lonDms,
-    distanceNm = Math.round(dist * 10.0) / 10.0,
+    distanceNm = seaRoute.totalDistanceNm,
     bearingDegrees = bearing,
-    speedKnots = Math.round(safeSpeed * 10.0) / 10.0,
-    etaTime = etaTimeStr,
-    fullEtaDate = fullDateStr
+    speedKnots = seaRoute.speedKnots,
+    etaTime = seaRoute.etaTimeStr,
+    fullEtaDate = seaRoute.fullEtaDateStr,
+    isSeaRoute = seaRoute.isSeaRouteWithWaypoints,
+    waypoints = seaRoute.waypoints,
+    routeSummaryText = summaryText
   )
 }

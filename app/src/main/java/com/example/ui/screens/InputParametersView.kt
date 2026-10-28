@@ -50,7 +50,6 @@ import com.example.location.GpsLocationProvider
 import com.example.model.LocationPresets
 import com.example.ui.TideNavViewModel
 import com.example.ui.TideUiState
-import com.example.ui.components.AisVesselDetailDialog
 import com.example.ui.components.AnchorCalculationCard
 import com.example.ui.components.BridgeTelemetryCard
 import com.example.ui.components.EtaPositionCard
@@ -70,7 +69,6 @@ fun InputParametersView(
   onNavigateToWeather: () -> Unit = {},
   onNavigateToAnchor: () -> Unit = {},
   onNavigateToMap: () -> Unit = {},
-  onNavigateToAis: () -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   val scrollState = rememberScrollState()
@@ -196,16 +194,46 @@ fun InputParametersView(
             )
           }
 
-          Surface(
-            shape = RoundedCornerShape(4.dp),
-            color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0)
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
           ) {
-            Text(
-              text = if (activeGps != null) "Hassasiyet: ±${String.format(Locale.US, "%.1f", activeGps.accuracyMeters)}m" else "STATİK / KÖPRÜÜSTÜ",
-              style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Bold),
-              color = if (activeGps != null) (if (isDark) Color(0xFF6EE7B7) else Color(0xFF065F46)) else (if (isDark) Color(0xFF94A3B8) else Color(0xFF475569)),
-              modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-            )
+            Surface(
+              onClick = { viewModel.setShowVoiceSettingsDialog(true) },
+              shape = RoundedCornerShape(4.dp),
+              color = if (isDark) Color(0xFF0369A1) else Color(0xFF0284C7),
+              modifier = Modifier.testTag("btn_open_voice_settings_telemetry")
+            ) {
+              Row(
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
+              ) {
+                Icon(
+                  imageVector = Icons.Default.RecordVoiceOver,
+                  contentDescription = "Ses Ayarları",
+                  tint = Color.White,
+                  modifier = Modifier.size(11.dp)
+                )
+                Text(
+                  text = "Anons Ayarları",
+                  style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Bold),
+                  color = Color.White
+                )
+              }
+            }
+
+            Surface(
+              shape = RoundedCornerShape(4.dp),
+              color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0)
+            ) {
+              Text(
+                text = if (activeGps != null) "Hassasiyet: ±${String.format(Locale.US, "%.1f", activeGps.accuracyMeters)}m" else "STATİK / KÖPRÜÜSTÜ",
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Bold),
+                color = if (activeGps != null) (if (isDark) Color(0xFF6EE7B7) else Color(0xFF065F46)) else (if (isDark) Color(0xFF94A3B8) else Color(0xFF475569)),
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+              )
+            }
           }
         }
 
@@ -595,21 +623,92 @@ fun InputParametersView(
       onToggleHold = { viewModel.toggleAttitudeHold() },
       modifier = Modifier.fillMaxWidth()
     )
+
+    // 7. YASAL SORUMLULUK MUAFİYETİ VE SEYİR İKAZI (LEGAL DISCLAIMER)
+    var isDisclaimerExpanded by rememberSaveable { mutableStateOf(false) }
+    Surface(
+      shape = RoundedCornerShape(8.dp),
+      color = if (isDark) Color(0xFF1E293B).copy(alpha = 0.5f) else Color(0xFFF1F5F9),
+      border = androidx.compose.foundation.BorderStroke(1.dp, if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1)),
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(top = 4.dp, bottom = 8.dp)
+        .testTag("card_legal_disclaimer")
+    ) {
+      Column(
+        modifier = Modifier
+          .clickable { isDisclaimerExpanded = !isDisclaimerExpanded }
+          .padding(10.dp)
+      ) {
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Icon(
+              imageVector = Icons.Default.Gavel,
+              contentDescription = null,
+              tint = if (isDark) Color(0xFF94A3B8) else Color(0xFF475569),
+              modifier = Modifier.size(15.dp)
+            )
+            Text(
+              text = "YASAL UYARI & SORUMLULUK SINIRLANDIRMASI",
+              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.5.sp, letterSpacing = 0.3.sp),
+              color = if (isDark) Color(0xFF94A3B8) else Color(0xFF475569)
+            )
+          }
+          Icon(
+            imageVector = if (isDisclaimerExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+            contentDescription = null,
+            tint = if (isDark) Color(0xFF94A3B8) else Color(0xFF475569),
+            modifier = Modifier.size(16.dp)
+          )
+        }
+
+        AnimatedVisibility(
+          visible = isDisclaimerExpanded,
+          enter = expandVertically() + fadeIn(),
+          exit = shrinkVertically() + fadeOut()
+        ) {
+          Column(
+            modifier = Modifier.padding(top = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+          ) {
+            Text(
+              text = "⚠️ GAYRİRESMİ SEYİR YARDIMCISIDIR (NOT FOR NAVIGATION)",
+              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black, fontSize = 9.5.sp),
+              color = if (isDark) Color(0xFFEF4444) else Color(0xFFB91C1C)
+            )
+            Text(
+              text = "Bu yazılım; gelgit, derinlik, squat (çökelme), demirleme zinciri salma dairesi ve çatışma riski (CPA/TCPA) tahminlerini tamamen teorik ve matematiksel algoritmalarla (Meeus Astronomi Modellemesi, Barrass formülleri vb.) gerçekleştirmektedir. Bu tahminler hava durumu, rüzgar, lokal dip topografyası ve ani su seviyesi değişikliklerine göre gerçekte farklılık gösterebilir.",
+              style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, lineHeight = 14.sp),
+              color = textSecondary
+            )
+            Text(
+              text = "SOLAS, IMO ve uluslararası deniz emniyeti kanunları uyarınca, hiçbir mobil veya gayriresmi yazılım; resmi kağıt haritaların, hidrografi dairesi yayınlarının ve IMO tip onaylı ECDIS sistemlerinin yerine kullanılamaz. Geminin, yükün ve mürettebatın can, mal ve seyir emniyetinden tamamen ve tek başına geminin Kaptanı (Master) sorumludur.",
+              style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, lineHeight = 14.sp),
+              color = textSecondary
+            )
+            Text(
+              text = "Hesaplama sapmalarından, donanımsal sensör hatalarından, internet veya GPS sinyal kesintilerinden ve veri gecikmelerinden kaynaklanabilecek karaya oturma, çatışma, kaza, can/mal kaybı veya herhangi bir hasardan yazılımın geliştiricileri, yayıncıları ve sağlayıcıları hiçbir şekilde yasal veya cezai olarak sorumlu tutulamaz. Uygulamanın köprüüstünde seyir/nöbet amacıyla kullanımı tamamen kullanıcının kendi sorumluluğundadır.",
+              style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, lineHeight = 14.sp, fontWeight = FontWeight.Bold),
+              color = if (isDark) Color(0xFFFCD34D) else Color(0xFFB45309)
+            )
+          }
+        }
+        
+        if (!isDisclaimerExpanded) {
+          Text(
+            text = "SOLAS/IMO standardı yasal uyarıyı ve sorumluluk muafiyeti detaylarını okumak için tıklayın.",
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp, color = textMuted),
+            modifier = Modifier.padding(top = 4.dp)
+          )
+        }
+      }
+    }
   }
 }
-
-  // AIS Gemi Detayları ve Canlı Bilgi İletişim Kutusu
-  if (uiState.showAisDetailDialog) {
-    val aisToShow = uiState.activeAisVesselData ?: com.example.engine.AisTrackingEngine.getNb252ShipData()
-    AisVesselDetailDialog(
-      aisData = aisToShow,
-      onDismiss = { viewModel.setShowAisDetailDialog(false) },
-      onApplyToApp = { selectedShip ->
-        viewModel.applyAisVesselData(selectedShip)
-      },
-      isDarkMode = isDark
-    )
-  }
 }
 
 /**

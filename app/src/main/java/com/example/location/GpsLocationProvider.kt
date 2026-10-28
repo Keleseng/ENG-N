@@ -30,13 +30,62 @@ class GpsLocationProvider(private val context: Context) {
 
   private var previousFix: GpsFix? = null
 
+  private fun buildFixFromLocation(location: Location): GpsFix {
+    var computedSpeedKnots = if (location.hasSpeed() && location.speed >= 0f) {
+      location.speed * 1.94384
+    } else null
+
+    val prev = previousFix
+    if (computedSpeedKnots == null && prev != null) {
+      val timeDeltaSec = (location.time - prev.timestampEpochMs) / 1000.0
+      if (timeDeltaSec in 0.5..30.0) {
+        val distNm = haversineDistanceNm(prev.latitude, prev.longitude, location.latitude, location.longitude)
+        computedSpeedKnots = (distNm / (timeDeltaSec / 3600.0)).coerceIn(0.0, 50.0)
+      }
+    }
+
+    var computedBearing = if (location.hasBearing()) location.bearing else null
+    if (computedBearing == null && prev != null) {
+      val distNm = haversineDistanceNm(prev.latitude, prev.longitude, location.latitude, location.longitude)
+      if (distNm >= 0.004) {
+        val phi1 = Math.toRadians(prev.latitude)
+        val phi2 = Math.toRadians(location.latitude)
+        val dLon = Math.toRadians(location.longitude - prev.longitude)
+        val y = sin(dLon) * cos(phi2)
+        val x = cos(phi1) * sin(phi2) - sin(phi1) * cos(phi2) * cos(dLon)
+        computedBearing = (((Math.toDegrees(atan2(y, x)) + 360.0) % 360.0)).toFloat()
+      }
+    }
+
+    val fix = GpsFix(
+      latitude = location.latitude,
+      longitude = location.longitude,
+      accuracyMeters = location.accuracy,
+      speedKnots = computedSpeedKnots,
+      bearingDegrees = computedBearing,
+      altitudeMeters = if (location.hasAltitude()) location.altitude else null,
+      timestampEpochMs = location.time
+    )
+    previousFix = fix
+    return fix
+  }
+
   /**
-   * Sürekli Canlı GPS Konum Akışı (Continuous Location Updates Flow)
+   * Sürekli Canlı GPS Konum Akışı (Hem Fused hem Doğrudan Uydu GNSS - %100 İnternetsiz Çalışır)
    */
   @SuppressLint("MissingPermission")
-  fun startLocationUpdates(intervalMs: Long = 2000L): Flow<GpsFix> = callbackFlow {
+  fun startLocationUpdates(intervalMs: Long = 1500L): Flow<GpsFix> = callbackFlow {
+    var lastEmittedMs = 0L
+
+    fun emitDeduplicated(location: Location) {
+      val now = System.currentTimeMillis()
+      if (now - lastEmittedMs < 350L) return
+      lastEmittedMs = now
+      trySend(buildFixFromLocation(location))
+    }
+
     val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, intervalMs)
-      .setMinUpdateIntervalMillis(1000L)
+      .setMinUpdateIntervalMillis(800L)
       .setMinUpdateDistanceMeters(0.5f)
       .setWaitForAccurateLocation(false)
       .build()
@@ -44,96 +93,124 @@ class GpsLocationProvider(private val context: Context) {
     val locationCallback = object : LocationCallback() {
       override fun onLocationResult(result: LocationResult) {
         val location = result.lastLocation ?: return
-
-        var computedSpeedKnots = if (location.hasSpeed() && location.speed >= 0f) {
-          location.speed * 1.94384 // m/s to knots
-        } else null
-
-        // Eğer GPS donanımı anlık hız vermediyse önceki koordinat farkından (haversine) hesapla
-        val prev = previousFix
-        if (computedSpeedKnots == null && prev != null) {
-          val timeDeltaSec = (location.time - prev.timestampEpochMs) / 1000.0
-          if (timeDeltaSec in 0.5..30.0) {
-            val distNm = haversineDistanceNm(prev.latitude, prev.longitude, location.latitude, location.longitude)
-            computedSpeedKnots = (distNm / (timeDeltaSec / 3600.0)).coerceIn(0.0, 50.0)
-          }
-        }
-
-        val fix = GpsFix(
-          latitude = location.latitude,
-          longitude = location.longitude,
-          accuracyMeters = location.accuracy,
-          speedKnots = computedSpeedKnots,
-          bearingDegrees = if (location.hasBearing()) location.bearing else null,
-          altitudeMeters = if (location.hasAltitude()) location.altitude else null,
-          timestampEpochMs = location.time
-        )
-        previousFix = fix
-        trySend(fix)
+        emitDeduplicated(location)
       }
+    }
+
+    val locManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+    val rawGnssListener = android.location.LocationListener { location ->
+      emitDeduplicated(location)
     }
 
     try {
       fusedClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
-    } catch (e: Exception) {
-      close(e)
-    }
+    } catch (_: Exception) {}
+
+    try {
+      if (locManager?.isProviderEnabled(LocationManager.GPS_PROVIDER) == true) {
+        locManager.requestLocationUpdates(
+          LocationManager.GPS_PROVIDER,
+          1000L,
+          0.5f,
+          rawGnssListener,
+          Looper.getMainLooper()
+        )
+      }
+    } catch (_: Exception) {}
 
     awaitClose {
-      fusedClient.removeLocationUpdates(locationCallback)
+      try { fusedClient.removeLocationUpdates(locationCallback) } catch (_: Exception) {}
+      try { locManager?.removeUpdates(rawGnssListener) } catch (_: Exception) {}
     }
   }
 
   @SuppressLint("MissingPermission")
   suspend fun getCurrentGpsFix(): Result<GpsFix> {
     return suspendCancellableCoroutine { continuation ->
-      try {
-        val priority = Priority.PRIORITY_HIGH_ACCURACY
-        val cancellationTokenSource = com.google.android.gms.tasks.CancellationTokenSource()
+      val completed = java.util.concurrent.atomic.AtomicBoolean(false)
+      val mainHandler = android.os.Handler(Looper.getMainLooper())
 
+      fun finishOnce(res: Result<GpsFix>) {
+        if (completed.compareAndSet(false, true)) {
+          continuation.resume(res)
+        }
+      }
+
+      try {
+        val locManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+        var oneShotListener: android.location.LocationListener? = null
+
+        val timeoutRunnable = Runnable {
+          try { oneShotListener?.let { locManager?.removeUpdates(it) } } catch (_: Exception) {}
+          getLastKnownLocationFallback { fallbackFix ->
+            if (fallbackFix != null) {
+              previousFix = fallbackFix
+              finishOnce(Result.success(fallbackFix))
+            } else {
+              finishOnce(Result.failure(Exception("Uydu GPS sinyali bekleniyor. Açık alanda konum servislerinin açık olduğundan emin olun.")))
+            }
+          }
+        }
+        mainHandler.postDelayed(timeoutRunnable, 3800L)
+
+        // Doğrudan donanımsal Uydu GPS dinleyicisi (İnternetsiz ortamda anında yanıt verir)
+        if (locManager?.isProviderEnabled(LocationManager.GPS_PROVIDER) == true) {
+          oneShotListener = android.location.LocationListener { loc ->
+            mainHandler.removeCallbacks(timeoutRunnable)
+            try { oneShotListener?.let { locManager.removeUpdates(it) } } catch (_: Exception) {}
+            finishOnce(Result.success(buildFixFromLocation(loc)))
+          }
+          try {
+            locManager.requestLocationUpdates(
+              LocationManager.GPS_PROVIDER,
+              500L,
+              0f,
+              oneShotListener,
+              Looper.getMainLooper()
+            )
+          } catch (_: Exception) {}
+        }
+
+        val cancellationTokenSource = com.google.android.gms.tasks.CancellationTokenSource()
         continuation.invokeOnCancellation {
+          mainHandler.removeCallbacks(timeoutRunnable)
+          try { oneShotListener?.let { locManager?.removeUpdates(it) } } catch (_: Exception) {}
           cancellationTokenSource.cancel()
         }
 
-        fusedClient.getCurrentLocation(priority, cancellationTokenSource.token)
+        fusedClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cancellationTokenSource.token)
           .addOnSuccessListener { location: Location? ->
+            mainHandler.removeCallbacks(timeoutRunnable)
+            try { oneShotListener?.let { locManager?.removeUpdates(it) } } catch (_: Exception) {}
             if (location != null) {
-              val fix = GpsFix(
-                latitude = location.latitude,
-                longitude = location.longitude,
-                accuracyMeters = location.accuracy,
-                speedKnots = if (location.hasSpeed()) location.speed * 1.94384 else null, // m/s to knots
-                bearingDegrees = if (location.hasBearing()) location.bearing else null,
-                altitudeMeters = if (location.hasAltitude()) location.altitude else null,
-                timestampEpochMs = location.time
-              )
-              previousFix = fix
-              continuation.resume(Result.success(fix))
+              finishOnce(Result.success(buildFixFromLocation(location)))
             } else {
               getLastKnownLocationFallback { fallbackFix ->
                 if (fallbackFix != null) {
                   previousFix = fallbackFix
-                  continuation.resume(Result.success(fallbackFix))
+                  finishOnce(Result.success(fallbackFix))
                 } else {
-                  continuation.resume(Result.failure(Exception("GPS konumu alınamadı. Lütfen cihaz konum servislerinin açık olduğundan emin olun.")))
+                  finishOnce(Result.failure(Exception("GPS konumu alınamadı. Lütfen cihaz konum servislerinin açık olduğundan emin olun.")))
                 }
               }
             }
           }
           .addOnFailureListener { error ->
+            mainHandler.removeCallbacks(timeoutRunnable)
+            try { oneShotListener?.let { locManager?.removeUpdates(it) } } catch (_: Exception) {}
             getLastKnownLocationFallback { fallbackFix ->
               if (fallbackFix != null) {
                 previousFix = fallbackFix
-                continuation.resume(Result.success(fallbackFix))
+                finishOnce(Result.success(fallbackFix))
               } else {
-                continuation.resume(Result.failure(error))
+                finishOnce(Result.failure(error))
               }
             }
           }
       } catch (e: SecurityException) {
-        continuation.resume(Result.failure(Exception("Konum izni verilmedi.")))
+        finishOnce(Result.failure(Exception("Konum izni verilmedi.")))
       } catch (e: Exception) {
-        continuation.resume(Result.failure(e))
+        finishOnce(Result.failure(e))
       }
     }
   }

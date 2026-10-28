@@ -21,10 +21,17 @@ data class MarineDepthResult(
 )
 
 object MarineDepthProvider {
-  private val httpClient = OkHttpClient.Builder()
-    .connectTimeout(6, TimeUnit.SECONDS)
-    .readTimeout(6, TimeUnit.SECONDS)
-    .build()
+  private val httpClient get() = MarineNetworkClient.fastApiClient
+
+  private data class CachedDepth(val result: MarineDepthResult, val timestampMs: Long)
+  private val depthCache = object : LinkedHashMap<String, CachedDepth>(48, 0.75f, true) {
+    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CachedDepth>?): Boolean = size > 48
+  }
+  private const val DEPTH_TTL_MS = 15 * 60_000L
+
+  fun clearCache() {
+    synchronized(depthCache) { depthCache.clear() }
+  }
 
   /**
    * GPS koordinatının deniz derinliğini EMODnet Bathymetry REST API
@@ -35,6 +42,14 @@ object MarineDepthProvider {
    * batimetri modellerine geri çekilir.
    */
   suspend fun fetchMarineDepth(latitude: Double, longitude: Double): MarineDepthResult = withContext(Dispatchers.IO) {
+    val cacheKey = String.format(Locale.US, "%.3f_%.3f", latitude, longitude)
+    val nowMs = System.currentTimeMillis()
+    synchronized(depthCache) {
+      val cached = depthCache[cacheKey]
+      if (cached != null && (nowMs - cached.timestampMs) <= DEPTH_TTL_MS) {
+        return@withContext cached.result
+      }
+    }
     // 1. EMODNET BATHYMETRY REST SERVICE (Avrupa Deniz Gözlem ve Veri Ağı)
     try {
       // WKT formatında POINT(boylam enlem) - longitude latitude
@@ -76,7 +91,7 @@ object MarineDepthProvider {
           val lowerBound = if (minRounded != null && maxRounded != null) minOf(minRounded, maxRounded) else minRounded
           val upperBound = if (minRounded != null && maxRounded != null) maxOf(minRounded, maxRounded) else maxRounded
 
-          return@withContext MarineDepthResult(
+          val res = MarineDepthResult(
             depthMeters = roundedDepth,
             sourceName = "EMODnet Bathymetry$idDesc",
             isOnlineVerified = true,
@@ -85,6 +100,10 @@ object MarineDepthProvider {
             minDepthMeters = lowerBound,
             maxDepthMeters = upperBound
           )
+          synchronized(depthCache) {
+            depthCache[cacheKey] = CachedDepth(res, System.currentTimeMillis())
+          }
+          return@withContext res
         }
       }
     } catch (e: Exception) {
@@ -112,23 +131,27 @@ object MarineDepthProvider {
             val item = results.getJSONObject(0)
             if (!item.isNull("elevation")) {
               val elevation = item.getDouble("elevation")
-              if (elevation <= 0) {
+              val res = if (elevation <= 0) {
                 val depth = abs(elevation)
                 val roundedDepth = (round(depth * 10.0) / 10.0).coerceAtLeast(0.5)
-                return@withContext MarineDepthResult(
+                MarineDepthResult(
                   depthMeters = roundedDepth,
                   sourceName = "GEBCO Bathymetry (Canlı)",
                   isOnlineVerified = true,
                   confidenceText = "GEBCO Sonar/Uydu Doğrulandı"
                 )
               } else {
-                return@withContext MarineDepthResult(
+                MarineDepthResult(
                   depthMeters = 3.5,
                   sourceName = "Kıyı Sığ Su Haritası",
                   isOnlineVerified = true,
                   confidenceText = "Kıyı Hattı (~3.5 m)"
                 )
               }
+              synchronized(depthCache) {
+                depthCache[cacheKey] = CachedDepth(res, System.currentTimeMillis())
+              }
+              return@withContext res
             }
           }
         }

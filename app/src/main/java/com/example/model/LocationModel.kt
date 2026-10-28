@@ -257,6 +257,211 @@ object LocationPresets {
       typicalTideRangeMeters = 0.4,
       description = "Kekova Batık Şehir, Doğal Korunaklı Ada Limanı ve Barınma Alanı",
       timeZoneOffsetHours = 3.0
+    ),
+    // --- DÜNYA ÇAPINDA STRATEJİK GEÇİTLER & BÜYÜK LİMANLAR ---
+    PortLocation(
+      id = "piraeus_port",
+      name = "Pire Limanı (Atina)",
+      country = "Yunanistan",
+      category = "Doğu Akdeniz / Ege Limanı",
+      latitude = 37.9420,
+      longitude = 23.6370,
+      defaultChartedDepthMeters = 19.0,
+      typicalTideRangeMeters = 0.4,
+      description = "Ege ve Doğu Akdeniz ana aktarma limanı",
+      timeZoneOffsetHours = 2.0
+    ),
+    PortLocation(
+      id = "suez_canal_port_said",
+      name = "Süveyş Kanalı / Port Said",
+      country = "Mısır",
+      category = "Küresel Stratejik Geçit / Kanal",
+      latitude = 31.2625,
+      longitude = 32.3056,
+      defaultChartedDepthMeters = 24.0,
+      typicalTideRangeMeters = 0.8,
+      description = "Akdeniz ile Kızıldeniz'i birbirine bağlayan dünya deniz ticaretinin ana stratejik kanalı",
+      timeZoneOffsetHours = 2.0
+    ),
+    PortLocation(
+      id = "strait_of_gibraltar",
+      name = "Cebelitarık Boğazı (Gibraltar)",
+      country = "İngiltere / İspanya",
+      category = "Küresel Stratejik Boğaz",
+      latitude = 35.9800,
+      longitude = -5.6000,
+      defaultChartedDepthMeters = 300.0,
+      typicalTideRangeMeters = 1.2,
+      description = "Akdeniz'in Atlas Okyanusu'na açılan ana stratejik boğazı",
+      timeZoneOffsetHours = 1.0
+    ),
+    PortLocation(
+      id = "bab_el_mandeb_djibouti",
+      name = "Bâbülmendep Boğazı / Cibuti",
+      country = "Cibuti",
+      category = "Kızıldeniz Girişi",
+      latitude = 11.5950,
+      longitude = 43.1480,
+      defaultChartedDepthMeters = 180.0,
+      typicalTideRangeMeters = 1.5,
+      description = "Kızıldeniz ile Hint Okyanusu Aden Körfezi bağlantı boğazı",
+      timeZoneOffsetHours = 3.0
+    ),
+    PortLocation(
+      id = "strait_of_hormuz_dubai",
+      name = "Hürmüz Boğazı / Dubai (Jebel Ali)",
+      country = "Birleşik Arap Emirlikleri",
+      category = "Fars Körfezi / Petrol Hub",
+      latitude = 25.0083,
+      longitude = 55.0617,
+      defaultChartedDepthMeters = 17.0,
+      typicalTideRangeMeters = 1.8,
+      description = "Dünya ham petrol sevkiyatının en kritik deniz geçidi ve Orta Doğu ana limanı",
+      timeZoneOffsetHours = 4.0
+    ),
+    PortLocation(
+      id = "english_channel_dover",
+      name = "Manş Denizi / Dover & Calais",
+      country = "İngiltere / Fransa",
+      category = "Kuzey Avrupa Boğazı",
+      latitude = 51.1275,
+      longitude = 1.3134,
+      defaultChartedDepthMeters = 45.0,
+      typicalTideRangeMeters = 5.8,
+      description = "Kuzey Denizi ile Atlas Okyanusu arasındaki yüksek gelgitli Manş Boğazı",
+      timeZoneOffsetHours = 0.0
+    ),
+    PortLocation(
+      id = "rotterdam_europort",
+      name = "Rotterdam Europort Limanı",
+      country = "Hollanda",
+      category = "Avrupa Ana Liman",
+      latitude = 51.9550,
+      longitude = 4.1350,
+      defaultChartedDepthMeters = 24.0,
+      typicalTideRangeMeters = 2.2,
+      description = "Avrupa'nın en büyük konteyner ve enerji terminali",
+      timeZoneOffsetHours = 1.0
+    ),
+    PortLocation(
+      id = "hamburg_port",
+      name = "Hamburg Limanı (Elbe Nehri)",
+      country = "Almanya",
+      category = "Kuzey Avrupa / Ticaret Limanı",
+      latitude = 53.5430,
+      longitude = 9.9700,
+      defaultChartedDepthMeters = 15.0,
+      typicalTideRangeMeters = 3.6,
+      description = "Almanya'nın ana deniz ticaret kapısı",
+      timeZoneOffsetHours = 1.0
+    ),
+    PortLocation(
+      id = "panama_canal_colon",
+      name = "Panama Kanalı / Colon - Balboa",
+      country = "Panama",
+      category = "Küresel Stratejik Geçit / Kanal",
+      latitude = 9.3592,
+      longitude = -79.9014,
+      defaultChartedDepthMeters = 18.0,
+      typicalTideRangeMeters = 0.6,
+      description = "Atlas Okyanusu ile Büyük Okyanus'u bağlayan kilit dünya kanalı",
+      timeZoneOffsetHours = -5.0
+    ),
+    PortLocation(
+      id = "singapore_malacca_strait",
+      name = "Singapur / Malaka Boğazı",
+      country = "Singapur",
+      category = "Küresel Ana Yakıt & Konteyner Hub",
+      latitude = 1.290270,
+      longitude = 103.851959,
+      defaultChartedDepthMeters = 22.0,
+      typicalTideRangeMeters = 2.5,
+      description = "Hint Okyanusu ile Pasifik'i bağlayan dünyanın en yoğun yakıt ikmal ve konteyner limanı",
+      timeZoneOffsetHours = 8.0
+    ),
+    PortLocation(
+      id = "shanghai_yangshan_port",
+      name = "Şanghay / Yangshan Derin Su Limanı",
+      country = "Çin",
+      category = "Doğu Asya Mega Liman",
+      latitude = 30.6260,
+      longitude = 122.0650,
+      defaultChartedDepthMeters = 16.5,
+      typicalTideRangeMeters = 4.0,
+      description = "Dünyanın en yüksek konteyner hacmine sahip mega limanı",
+      timeZoneOffsetHours = 8.0
+    ),
+    PortLocation(
+      id = "tokyo_yokohama_port",
+      name = "Tokyo & Yokohama Limanı",
+      country = "Japonya",
+      category = "Pasifik / Asya Hub",
+      latitude = 35.4430,
+      longitude = 139.6500,
+      defaultChartedDepthMeters = 16.0,
+      typicalTideRangeMeters = 2.0,
+      description = "Japonya Tokyo Körfezi ana deniz ticaret limanı",
+      timeZoneOffsetHours = 9.0
+    ),
+    PortLocation(
+      id = "new_york_nj_port",
+      name = "New York & New Jersey Limanı",
+      country = "ABD",
+      category = "Kuzey Amerika / Doğu Yakası",
+      latitude = 40.6680,
+      longitude = -74.1350,
+      defaultChartedDepthMeters = 15.2,
+      typicalTideRangeMeters = 1.6,
+      description = "ABD Doğu Yakası'nın en büyük konteyner limanı",
+      timeZoneOffsetHours = -5.0
+    ),
+    PortLocation(
+      id = "los_angeles_long_beach_port",
+      name = "Los Angeles & Long Beach Limanı",
+      country = "ABD",
+      category = "Kuzey Amerika / Pasifik Yakası",
+      latitude = 33.7400,
+      longitude = -118.2700,
+      defaultChartedDepthMeters = 16.0,
+      typicalTideRangeMeters = 1.8,
+      description = "ABD Batı Yakası'nın Pasifik deniz ticaret kapısı",
+      timeZoneOffsetHours = -8.0
+    ),
+    PortLocation(
+      id = "santos_port",
+      name = "Santos Limanı (Sao Paulo)",
+      country = "Brezilya",
+      category = "Güney Amerika / Ana Liman",
+      latitude = -23.9600,
+      longitude = -46.3000,
+      defaultChartedDepthMeters = 15.0,
+      typicalTideRangeMeters = 1.5,
+      description = "Güney Amerika Kıtası'nın en büyük deniz limanı",
+      timeZoneOffsetHours = -3.0
+    ),
+    PortLocation(
+      id = "cape_town_port",
+      name = "Cape Town / Ümit Burnu Limanı",
+      country = "Güney Afrika",
+      category = "Afrika / Ümit Burnu",
+      latitude = -33.9050,
+      longitude = 18.4350,
+      defaultChartedDepthMeters = 15.5,
+      typicalTideRangeMeters = 1.8,
+      description = "Atlas ve Hint Okyanusu kesişim noktası Ümit Burnu limanı",
+      timeZoneOffsetHours = 2.0
+    ),
+    PortLocation(
+      id = "sydney_port_jackson",
+      name = "Sydney Limanı (Port Jackson)",
+      country = "Avustralya",
+      category = "Okyanusya / Ana Liman",
+      latitude = -33.8568,
+      longitude = 151.2153,
+      defaultChartedDepthMeters = 14.0,
+      typicalTideRangeMeters = 1.5,
+      description = "Avustralya Doğu Kıyısı ana deniz limanı",
+      timeZoneOffsetHours = 10.0
     )
   )
 
@@ -577,6 +782,27 @@ object LocationPresets {
       kotlin.math.sin(lat1Rad) * kotlin.math.cos(lat2Rad) * kotlin.math.cos(dLon)
     val bearing = Math.toDegrees(kotlin.math.atan2(y, x))
     return ((bearing + 360) % 360).toInt()
+  }
+
+  fun calculateMinDistanceToPathNm(pLat: Double, pLon: Double, path: List<Coordinate>): Double {
+    if (path.isEmpty()) return 0.0
+    if (path.size == 1) return calculateDistanceNm(pLat, pLon, path[0].latitude, path[0].longitude)
+
+    var minDistNm = Double.MAX_VALUE
+    for (i in 0 until path.size - 1) {
+      val p1 = path[i]
+      val p2 = path[i + 1]
+      for (step in 0..8) {
+        val fraction = step / 8.0
+        val sampleLat = p1.latitude + (p2.latitude - p1.latitude) * fraction
+        val sampleLon = p1.longitude + (p2.longitude - p1.longitude) * fraction
+        val dist = calculateDistanceNm(pLat, pLon, sampleLat, sampleLon)
+        if (dist < minDistNm) {
+          minDistNm = dist
+        }
+      }
+    }
+    return if (minDistNm == Double.MAX_VALUE) 0.0 else minDistNm
   }
 
   fun getNearestPorts(lat: Double, lon: Double, speedKnots: Double = 10.0): List<NearestPortResult> {

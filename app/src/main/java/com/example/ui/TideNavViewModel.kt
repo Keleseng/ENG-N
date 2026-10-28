@@ -114,7 +114,15 @@ data class TideUiState(
   val surroundingAisTargets: List<com.example.model.RadarAisTarget> = emptyList(),
   val selectedRadarTarget: com.example.model.RadarAisTarget? = null,
   val radarRangeNm: Double = 6.0,
-  val isRadarHeadUp: Boolean = true
+  val isRadarHeadUp: Boolean = true,
+  val isAnchorDragging: Boolean = false,
+  val isDeviceMuted: Boolean = false,
+  val activeSeaRoute: com.example.engine.MarineSeaRoute? = null,
+  val lastAnnouncedWaypointId: String? = null,
+  val isVoiceGuidanceEnabled: Boolean = true,
+  val ttsPitch: Float = 1.32f,
+  val ttsSpeechRate: Float = 1.0f,
+  val showVoiceSettingsDialog: Boolean = false
 )
 
 private fun calculateInitialAnchorResult(): AnchorCalculationResult {
@@ -177,13 +185,108 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
   private val attitudeProvider = MarineAttitudeProvider(application.applicationContext)
   private var continuousTrackingJob: Job? = null
   private var autoTxtLogJob: Job? = null
+  private var debounceCalcJob: Job? = null
+  private var debounceWeatherJob: Job? = null
+
+  private val bgExceptionHandler = kotlinx.coroutines.CoroutineExceptionHandler { _, throwable ->
+    android.util.Log.w("TideNavViewModel", "Guarded coroutine exception: ${throwable.message}")
+    _uiState.update { it.copy(isDepthLoading = false, isGpsLoading = false) }
+  }
+
+  // Ağ ve işlemci yükünü düşüren akıllı önbellek değişkenleri
+  private var lastWeatherFetchLat: Double? = null
+  private var lastWeatherFetchLon: Double? = null
+  private var lastWeatherFetchTimeMs: Long = 0L
+  private var lastDepthFetchLat: Double? = null
+  private var lastDepthFetchLon: Double? = null
+  private var lastOffRouteAlertTimeMs: Long = 0L
+
+  private var voiceGuidance: com.example.util.MarineVoiceGuidance? = null
 
   init {
+    try {
+      voiceGuidance = com.example.util.MarineVoiceGuidance(application)
+    } catch (_: Exception) {}
     syncRealMoonData()
-    fetchDepthFromMmsiVessel()
     observeCalculationHistory()
     startAttitudeMonitoring()
     startAuto30MinTxtLogging()
+    viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default + bgExceptionHandler) {
+      val defaultPort = LocationPresets.defaultPorts[0]
+      calculateAndSetSeaRoute(defaultPort.latitude, defaultPort.longitude, defaultPort.name, playVoice = false)
+    }
+    fetchVerifiedDepth()
+    refreshWeather()
+  }
+
+  private fun scheduleFastRecalculation(
+    recomputeSpeedAndEta: Boolean = false,
+    recomputeSeaRoute: Boolean = false,
+    debouncedWeatherRefresh: Boolean = false
+  ) {
+    debounceCalcJob?.cancel()
+    debounceCalcJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default + bgExceptionHandler) {
+      kotlinx.coroutines.delay(110L)
+      val snap = _uiState.value
+      val newAnalysis = computeAnalysis(snap)
+      val newSpeedRes = if (recomputeSpeedAndEta) computeSpeedCalculation(snap) else snap.speedCalculationResult
+      val newSimpleEta = if (recomputeSpeedAndEta) computeSimpleEta(snap) else snap.simpleEtaResult
+
+      val originLat = snap.lastGpsFix?.latitude
+        ?: com.example.model.LocationPresets.parseCoordinateOrDecimal(snap.latStr)
+        ?: 40.82833
+      val originLon = snap.lastGpsFix?.longitude
+        ?: com.example.model.LocationPresets.parseCoordinateOrDecimal(snap.lonStr)
+        ?: 29.25399
+      val effSpeed = snap.speedStr.toDoubleOrNull()?.takeIf { it > 0.0 }
+        ?: snap.lastGpsFix?.speedKnots?.takeIf { it > 0.0 }
+        ?: 10.0
+
+      val newSeaRoute = if (recomputeSeaRoute && snap.activeSeaRoute != null) {
+        val prev = snap.activeSeaRoute
+        com.example.engine.MarineSeaRoutingEngine.calculateSeaRoute(
+          originLat = originLat,
+          originLon = originLon,
+          destLat = prev.destLat,
+          destLon = prev.destLon,
+          speedKnots = effSpeed,
+          targetName = prev.destinationName
+        )
+      } else {
+        snap.activeSeaRoute
+      }
+
+      val newReceipt = if (recomputeSpeedAndEta && snap.selectedSimpleEtaDestination != null) {
+        val dest = snap.selectedSimpleEtaDestination
+        com.example.model.computeEtaSummary(
+          originLat,
+          originLon,
+          effSpeed,
+          com.example.model.Coordinate(dest.lat, dest.lon),
+          dest.name
+        )
+      } else {
+        snap.etaSummaryReceipt
+      }
+
+      _uiState.update { current ->
+        current.copy(
+          analysis = newAnalysis,
+          speedCalculationResult = newSpeedRes,
+          simpleEtaResult = newSimpleEta,
+          etaSummaryReceipt = newReceipt,
+          activeSeaRoute = newSeaRoute
+        )
+      }
+    }
+
+    if (debouncedWeatherRefresh) {
+      debounceWeatherJob?.cancel()
+      debounceWeatherJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO + bgExceptionHandler) {
+        kotlinx.coroutines.delay(550L)
+        refreshWeather()
+      }
+    }
   }
 
   private fun observeCalculationHistory() {
@@ -293,7 +396,6 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
       val lat = com.example.model.LocationPresets.parseCoordinateOrDecimal(_uiState.value.latStr) ?: _uiState.value.selectedPort.latitude
       val lon = com.example.model.LocationPresets.parseCoordinateOrDecimal(_uiState.value.lonStr) ?: _uiState.value.selectedPort.longitude
       val weather = weatherProvider.fetchMarineWeather(lat, lon)
-      fetchVerifiedDepth(lat, lon)
       _uiState.update { current ->
         val updated = current.copy(marineWeather = weather)
         val speedRes = computeSpeedCalculation(updated)
@@ -391,94 +493,77 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
   }
 
   fun updateLoa(value: String) {
-    _uiState.update { current ->
-      val updated = current.copy(loaStr = value)
-      updated.copy(analysis = computeAnalysis(updated))
-    }
+    _uiState.update { it.copy(loaStr = value) }
+    scheduleFastRecalculation()
   }
 
   fun updateBeam(value: String) {
-    _uiState.update { current ->
-      val updated = current.copy(beamStr = value)
-      updated.copy(analysis = computeAnalysis(updated))
-    }
+    _uiState.update { it.copy(beamStr = value) }
+    scheduleFastRecalculation()
   }
 
   fun updateDraft(value: String) {
-    _uiState.update { current ->
-      val updated = current.copy(draftStr = value)
-      updated.copy(analysis = computeAnalysis(updated))
-    }
+    _uiState.update { it.copy(draftStr = value) }
+    scheduleFastRecalculation()
   }
 
   fun updateLat(value: String) {
-    _uiState.update { current ->
-      val updated = current.copy(latStr = value, isCustomPort = true)
-      val speedRes = computeSpeedCalculation(updated)
-      updated.copy(
-        analysis = computeAnalysis(updated),
-        speedCalculationResult = speedRes
-      )
-    }
-    refreshWeather()
+    _uiState.update { it.copy(latStr = value, isCustomPort = true) }
+    scheduleFastRecalculation(recomputeSpeedAndEta = true, recomputeSeaRoute = true, debouncedWeatherRefresh = true)
   }
 
   fun updateLon(value: String) {
-    _uiState.update { current ->
-      val updated = current.copy(lonStr = value, isCustomPort = true)
-      val speedRes = computeSpeedCalculation(updated)
-      updated.copy(
-        analysis = computeAnalysis(updated),
-        speedCalculationResult = speedRes
-      )
-    }
-    refreshWeather()
+    _uiState.update { it.copy(lonStr = value, isCustomPort = true) }
+    scheduleFastRecalculation(recomputeSpeedAndEta = true, recomputeSeaRoute = true, debouncedWeatherRefresh = true)
   }
 
   fun updateChartedDepth(value: String) {
-    _uiState.update { current ->
-      val updated = current.copy(chartedDepthStr = value)
-      updated.copy(analysis = computeAnalysis(updated))
-    }
+    _uiState.update { it.copy(chartedDepthStr = value) }
+    scheduleFastRecalculation()
   }
 
   fun updateUkc(value: String) {
-    _uiState.update { current ->
-      val updated = current.copy(ukcStr = value)
-      updated.copy(analysis = computeAnalysis(updated))
-    }
+    _uiState.update { it.copy(ukcStr = value) }
+    scheduleFastRecalculation()
   }
 
   fun updateSpeed(value: String) {
-    _uiState.update { current ->
-      val updated = current.copy(speedStr = value)
-      val speedRes = computeSpeedCalculation(updated)
-      updated.copy(
-        analysis = computeAnalysis(updated),
-        speedCalculationResult = speedRes
-      )
-    }
+    _uiState.update { it.copy(speedStr = value) }
+    scheduleFastRecalculation(recomputeSpeedAndEta = true, recomputeSeaRoute = true)
   }
 
   fun updateHeading(value: String) {
-    _uiState.update { current ->
-      val updated = current.copy(headingDegreesStr = value)
-      val speedRes = computeSpeedCalculation(updated)
-      updated.copy(
-        analysis = computeAnalysis(updated),
-        speedCalculationResult = speedRes
-      )
-    }
+    _uiState.update { it.copy(headingDegreesStr = value) }
+    scheduleFastRecalculation(recomputeSpeedAndEta = true)
   }
 
   private fun startAttitudeMonitoring() {
-    viewModelScope.launch {
+    viewModelScope.launch(bgExceptionHandler) {
+      var lastPitch = 0f
+      var lastRoll = 0f
+      var lastCompass = 0f
+      var lastActive = false
+
       attitudeProvider.startAttitudeUpdates(
+        updateIntervalMs = 400L,
         getHeadingDegrees = {
           _uiState.value.lastGpsFix?.bearingDegrees ?: (_uiState.value.headingDegreesStr.toFloatOrNull() ?: 270f)
         }
       ).collect { att ->
-        _uiState.update { it.copy(marineAttitude = att) }
+        // Sensör verisini yalnızca Anamenü (İnklinometre kartı görünürken) güncelle; diğer sekmelerde 0 yeniden çizim
+        if (_uiState.value.selectedTabIndex != 0 && att.isSensorActive == lastActive) {
+          return@collect
+        }
+        val pitchDiff = kotlin.math.abs(att.pitchDegrees - lastPitch)
+        val rollDiff = kotlin.math.abs(att.rollDegrees - lastRoll)
+        val compassDiff = kotlin.math.abs(att.compassDegrees - lastCompass)
+        if (pitchDiff >= 0.4f || rollDiff >= 0.4f || compassDiff >= 1.0f || att.isSensorActive != lastActive) {
+          lastPitch = att.pitchDegrees
+          lastRoll = att.rollDegrees
+          lastCompass = att.compassDegrees
+          lastActive = att.isSensorActive
+          _uiState.update { it.copy(marineAttitude = att) }
+        }
       }
     }
   }
@@ -534,42 +619,35 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
   }
 
   fun setSimpleEtaDestination(dest: com.example.model.SimpleDestination?) {
-    _uiState.update { current ->
-      val updated = current.copy(selectedSimpleEtaDestination = dest)
-      val simpleEta = computeSimpleEta(updated)
-      val receipt = if (dest != null) {
-        val lat = current.lastGpsFix?.latitude ?: com.example.model.LocationPresets.parseCoordinateOrDecimal(current.latStr) ?: 40.8360
-        val lon = current.lastGpsFix?.longitude ?: com.example.model.LocationPresets.parseCoordinateOrDecimal(current.lonStr) ?: 29.3010
-        val speed = current.lastGpsFix?.speedKnots?.takeIf { it > 0.5 }
-          ?: current.activeAisVesselData?.sogKnots?.takeIf { it > 0.5 }
-          ?: current.speedStr.toDoubleOrNull()?.takeIf { it > 0.5 }
-          ?: 12.0
-        com.example.model.computeEtaSummary(lat, lon, speed, com.example.model.Coordinate(dest.lat, dest.lon), dest.name)
-      } else null
-      updated.copy(
-        simpleEtaResult = simpleEta,
-        etaSummaryReceipt = receipt
-      )
+    if (dest == null) {
+      _uiState.update { current ->
+        current.copy(
+          selectedSimpleEtaDestination = null,
+          simpleEtaResult = null,
+          etaSummaryReceipt = null,
+          activeSeaRoute = null,
+          lastAnnouncedWaypointId = null
+        )
+      }
+      return
     }
+    calculateAndSetSeaRoute(
+      destLat = dest.lat,
+      destLon = dest.lon,
+      destName = dest.name,
+      playVoice = true,
+      rejectLandDestination = false
+    )
   }
 
   fun calculateAndSetEta(coord: com.example.model.Coordinate, targetName: String? = null) {
-    _uiState.update { current ->
-      val lat = current.lastGpsFix?.latitude ?: com.example.model.LocationPresets.parseCoordinateOrDecimal(current.latStr) ?: 40.8360
-      val lon = current.lastGpsFix?.longitude ?: com.example.model.LocationPresets.parseCoordinateOrDecimal(current.lonStr) ?: 29.3010
-      val speed = current.lastGpsFix?.speedKnots?.takeIf { it > 0.5 }
-        ?: current.activeAisVesselData?.sogKnots?.takeIf { it > 0.5 }
-        ?: current.speedStr.toDoubleOrNull()?.takeIf { it > 0.5 }
-        ?: 12.0
-      val receipt = com.example.model.computeEtaSummary(lat, lon, speed, coord, targetName)
-      val dest = com.example.model.SimpleDestination(targetName ?: "Varış Mevkii", coord.latitude, coord.longitude)
-      val simpleEta = com.example.model.calculateSimpleEta(lat, lon, speed, dest)
-      current.copy(
-        selectedSimpleEtaDestination = dest,
-        simpleEtaResult = simpleEta,
-        etaSummaryReceipt = receipt
-      )
-    }
+    calculateAndSetSeaRoute(
+      destLat = coord.latitude,
+      destLon = coord.longitude,
+      destName = targetName ?: "Varış Mevkii",
+      playVoice = true,
+      rejectLandDestination = false
+    )
   }
 
   fun setMapFocusCoordinate(coord: com.example.model.Coordinate?) {
@@ -580,7 +658,10 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
     val dest = state.selectedSimpleEtaDestination ?: return null
     val lat = state.lastGpsFix?.latitude ?: com.example.model.LocationPresets.parseCoordinateOrDecimal(state.latStr) ?: 40.8360
     val lon = state.lastGpsFix?.longitude ?: com.example.model.LocationPresets.parseCoordinateOrDecimal(state.lonStr) ?: 29.3010
-    val speed = state.lastGpsFix?.speedKnots ?: state.activeAisVesselData?.sogKnots ?: state.speedStr.toDoubleOrNull() ?: 0.0
+    val speed = state.speedStr.toDoubleOrNull()?.takeIf { it > 0.0 }
+      ?: state.lastGpsFix?.speedKnots?.takeIf { it > 0.0 }
+      ?: state.activeAisVesselData?.sogKnots?.takeIf { it > 0.0 }
+      ?: 10.0
     return com.example.model.calculateSimpleEta(lat, lon, speed, dest)
   }
 
@@ -809,12 +890,24 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
       )
       val speedRes = computeSpeedCalculation(updated)
       val anchorRes = computeAnchorCalculation(updated)
+      val simpleEta = computeSimpleEta(updated)
+      val receipt = updated.selectedSimpleEtaDestination?.let { dest ->
+        val lat = data.latitude
+        val lon = data.longitude
+        val speed = updated.speedStr.toDoubleOrNull()?.takeIf { it > 0.0 }
+          ?: data.sogKnots.takeIf { it > 0.0 }
+          ?: 10.0
+        com.example.model.computeEtaSummary(lat, lon, speed, com.example.model.Coordinate(dest.lat, dest.lon), dest.name)
+      } ?: updated.etaSummaryReceipt
       updated.copy(
         analysis = computeAnalysis(updated),
         speedCalculationResult = speedRes,
-        anchorCalculationResult = anchorRes
+        anchorCalculationResult = anchorRes,
+        simpleEtaResult = simpleEta,
+        etaSummaryReceipt = receipt
       )
     }
+    checkAnchorDragging(data.latitude, data.longitude)
     refreshWeather()
     fetchVerifiedDepth(data.latitude, data.longitude)
   }
@@ -951,7 +1044,17 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
       return
     }
 
-    fetchVerifiedDepth(fix.latitude, fix.longitude)
+    val now = System.currentTimeMillis()
+    val lastDepthLat = lastDepthFetchLat
+    val lastDepthLon = lastDepthFetchLon
+    val shouldFetchDepth = isExplicitSync || lastDepthLat == null || lastDepthLon == null ||
+      com.example.model.calculateHaversineDistanceNm(fix.latitude, fix.longitude, lastDepthLat, lastDepthLon) > 0.25
+
+    if (shouldFetchDepth) {
+      lastDepthFetchLat = fix.latitude
+      lastDepthFetchLon = fix.longitude
+      fetchVerifiedDepth(fix.latitude, fix.longitude)
+    }
     val latFormatted = if (formatAsDms) {
       com.example.model.LocationPresets.formatMarineLatDMS(fix.latitude)
     } else {
@@ -1034,14 +1137,87 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
       )
       val speedRes = computeSpeedCalculation(updated)
       val simpleEta = computeSimpleEta(updated)
+      val effSpeed = updated.speedStr.toDoubleOrNull()?.takeIf { it > 0.0 }
+        ?: fix.speedKnots?.takeIf { it > 0.0 }
+        ?: updated.activeAisVesselData?.sogKnots?.takeIf { it > 0.0 }
+        ?: 10.0
+
+      // Dönüş noktasına (DN) yaklaşım kontrolü: 0.35 NM içine girildiğinde sesli rota tavsiyesi ver
+      var announcedWpId = updated.lastAnnouncedWaypointId
+      updated.activeSeaRoute?.waypoints?.forEach { wp ->
+        val distToWp = LocationPresets.calculateDistanceNm(fix.latitude, fix.longitude, wp.latitude, wp.longitude)
+        if (distToWp <= 0.35 && announcedWpId != wp.id) {
+          announcedWpId = wp.id
+          if (updated.isVoiceGuidanceEnabled) {
+            voiceGuidance?.speakApproachingWaypoint(wp.name, wp.nextLegBearingDegrees)
+          }
+        }
+      }
+
+      // Rotadan 1 deniz mili ve üzeri sapma kontrolü (Off-Route Alert, 3 dk aralıklı)
+      val activeRoute = updated.activeSeaRoute
+      if (activeRoute != null && !activeRoute.isRejectedLandTarget && activeRoute.pathCoordinates.size >= 2) {
+        val offRouteNm = LocationPresets.calculateMinDistanceToPathNm(fix.latitude, fix.longitude, activeRoute.pathCoordinates)
+        if (offRouteNm > 1.0) {
+          if (updated.isVoiceGuidanceEnabled && (now - lastOffRouteAlertTimeMs > 180_000L)) {
+            lastOffRouteAlertTimeMs = now
+            voiceGuidance?.speakOffRouteWarning()
+          }
+        } else if (offRouteNm <= 0.8) {
+          lastOffRouteAlertTimeMs = 0L
+        }
+      }
+
+      val updatedSeaRoute = updated.activeSeaRoute?.let { prevRoute ->
+        if (isExplicitSync && prevRoute.pathCoordinates.size >= 2) {
+          val distFromRouteNm = LocationPresets.calculateMinDistanceToPathNm(
+            fix.latitude,
+            fix.longitude,
+            prevRoute.pathCoordinates
+          )
+          if (distFromRouteNm > 2.5) {
+            com.example.engine.MarineSeaRoutingEngine.calculateSeaRoute(
+              originLat = fix.latitude,
+              originLon = fix.longitude,
+              destLat = prevRoute.destLat,
+              destLon = prevRoute.destLon,
+              speedKnots = effSpeed,
+              targetName = prevRoute.destinationName
+            )
+          } else {
+            prevRoute
+          }
+        } else {
+          prevRoute
+        }
+      }
+
+      val receipt = updated.selectedSimpleEtaDestination?.let { dest ->
+        com.example.model.computeEtaSummary(fix.latitude, fix.longitude, effSpeed, com.example.model.Coordinate(dest.lat, dest.lon), dest.name)
+      } ?: updated.etaSummaryReceipt
       updated.copy(
         analysis = computeAnalysis(updated),
         speedCalculationResult = speedRes,
-        simpleEtaResult = simpleEta
+        simpleEtaResult = simpleEta,
+        etaSummaryReceipt = receipt,
+        activeSeaRoute = updatedSeaRoute,
+        lastAnnouncedWaypointId = announcedWpId
       )
     }
-    // Refresh weather asynchronously on new fix
-    refreshWeather()
+    checkAnchorDragging(fix.latitude, fix.longitude)
+    // Refresh weather asynchronously on new fix only when moved or timed out
+    val lastWLat = lastWeatherFetchLat
+    val lastWLon = lastWeatherFetchLon
+    val shouldFetchWeather = isExplicitSync || (now - lastWeatherFetchTimeMs > 5 * 60 * 1000L) ||
+      lastWLat == null || lastWLon == null ||
+      com.example.model.calculateHaversineDistanceNm(fix.latitude, fix.longitude, lastWLat, lastWLon) > 2.0
+
+    if (shouldFetchWeather) {
+      lastWeatherFetchLat = fix.latitude
+      lastWeatherFetchLon = fix.longitude
+      lastWeatherFetchTimeMs = now
+      refreshWeather()
+    }
   }
 
   fun refreshGps() {
@@ -1111,6 +1287,7 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
     _uiState.update {
       it.copy(
         anchorEvent = AnchorDropEvent(isAnchored = false),
+        isAnchorDragging = false,
         gpsSuccessMessage = "⚓ DEMİR ALINDI! Salma dairesi takibi durduruldu."
       )
     }
@@ -1807,6 +1984,230 @@ class TideNavViewModel(application: Application) : AndroidViewModel(application)
 
   fun dismissTxtLogMessage() {
     _uiState.update { it.copy(txtLogMessage = null) }
+  }
+
+  private var lastAlarmTriggerTimeMs = 0L
+  private var consecutiveDraggingPoints = 0
+
+  private fun triggerAnchorDraggingAlarm() {
+    val context = getApplication<Application>().applicationContext
+    val now = System.currentTimeMillis()
+    if (now - lastAlarmTriggerTimeMs > 4000L) { // Limit beep/vibration to once every 4 seconds to avoid flood
+      lastAlarmTriggerTimeMs = now
+      // 1. Play Sound
+      try {
+        val notification: android.net.Uri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM)
+        val r = android.media.RingtoneManager.getRingtone(context, notification)
+        r.play()
+        // Stop playing after 2 seconds
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+          try {
+            if (r.isPlaying) r.stop()
+          } catch (_: Exception) {}
+        }, 2000L)
+      } catch (e: Exception) {
+        try {
+          val toneG = android.media.ToneGenerator(android.media.AudioManager.STREAM_ALARM, 100)
+          toneG.startTone(android.media.ToneGenerator.TONE_CDMA_EMERGENCY_RINGBACK, 1500)
+        } catch (_: Exception) {}
+      }
+
+      // 2. Vibrate
+      try {
+        val vibrator = context.getSystemService(android.content.Context.VIBRATOR_SERVICE) as? android.os.Vibrator
+        if (vibrator != null && vibrator.hasVibrator()) {
+          if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            vibrator.vibrate(android.os.VibrationEffect.createWaveform(longArrayOf(0, 500, 200, 500), -1))
+          } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(longArrayOf(0, 500, 200, 500), -1)
+          }
+        }
+      } catch (_: Exception) {}
+    }
+  }
+
+  fun checkAnchorDragging(lat: Double, lon: Double) {
+    val context = getApplication<Application>().applicationContext
+    
+    // Check if device is muted or silent (Recommendation #4)
+    val audioManager = context.getSystemService(android.content.Context.AUDIO_SERVICE) as? android.media.AudioManager
+    val isMuted = if (audioManager != null) {
+      val rMode = audioManager.ringerMode
+      rMode == android.media.AudioManager.RINGER_MODE_SILENT || 
+      rMode == android.media.AudioManager.RINGER_MODE_VIBRATE || 
+      audioManager.getStreamVolume(android.media.AudioManager.STREAM_ALARM) == 0
+    } else false
+    
+    if (_uiState.value.isDeviceMuted != isMuted) {
+      _uiState.update { it.copy(isDeviceMuted = isMuted) }
+    }
+
+    val state = _uiState.value
+    if (state.anchorEvent.isAnchored) {
+      val distMeters = state.anchorEvent.calculateDistanceMeters(lat, lon)
+      val maxRadiusMeters = state.anchorCalculationResult.f_secondSwingingCircleMeters
+      val isCurrentlyDragging = distMeters > maxRadiusMeters
+      
+      if (isCurrentlyDragging) {
+        consecutiveDraggingPoints++
+        // Bypass GPS Drift: Only alarm if outside the boundary for at least 3 consecutive updates (Recommendation #2)
+        if (consecutiveDraggingPoints >= 3) {
+          if (!state.isAnchorDragging) {
+            _uiState.update { it.copy(isAnchorDragging = true) }
+          }
+          triggerAnchorDraggingAlarm()
+        }
+      } else {
+        consecutiveDraggingPoints = 0
+        if (state.isAnchorDragging) {
+          _uiState.update { it.copy(isAnchorDragging = false) }
+        }
+      }
+    } else {
+      consecutiveDraggingPoints = 0
+      if (state.isAnchorDragging) {
+        _uiState.update { it.copy(isAnchorDragging = false) }
+      }
+    }
+  }
+
+  fun calculateAndSetSeaRoute(
+    destLat: Double,
+    destLon: Double,
+    destName: String,
+    playVoice: Boolean = true,
+    rejectLandDestination: Boolean = false
+  ): com.example.engine.MarineSeaRoute {
+    val state = _uiState.value
+    val originLat = state.lastGpsFix?.latitude
+      ?: (LocationPresets.parseCoordinateOrDecimal(state.latStr) ?: state.selectedPort.latitude)
+    val originLon = state.lastGpsFix?.longitude
+      ?: (LocationPresets.parseCoordinateOrDecimal(state.lonStr) ?: state.selectedPort.longitude)
+    val speed = state.speedStr.toDoubleOrNull()?.takeIf { it > 0.0 }
+      ?: state.lastGpsFix?.speedKnots?.takeIf { it > 0.0 }
+      ?: 12.0
+
+    val seaRoute = com.example.engine.MarineSeaRoutingEngine.calculateSeaRoute(
+      originLat = originLat,
+      originLon = originLon,
+      destLat = destLat,
+      destLon = destLon,
+      speedKnots = speed,
+      targetName = destName,
+      rejectLandDestination = rejectLandDestination
+    )
+
+    if (seaRoute.isRejectedLandTarget) {
+      if (playVoice && _uiState.value.isVoiceGuidanceEnabled) {
+        voiceGuidance?.speakLandClickWarning()
+      }
+      return seaRoute
+    }
+
+    val safeDest = com.example.model.SimpleDestination(destName, seaRoute.destLat, seaRoute.destLon)
+    val safeCoord = com.example.model.Coordinate(seaRoute.destLat, seaRoute.destLon)
+    val simpleEta = com.example.model.calculateSimpleEta(originLat, originLon, speed, safeDest)
+    val receipt = com.example.model.computeEtaSummary(originLat, originLon, speed, safeCoord, destName)
+
+    _uiState.update { cur ->
+      cur.copy(
+        activeSeaRoute = seaRoute,
+        selectedSimpleEtaDestination = safeDest,
+        simpleEtaResult = simpleEta,
+        etaSummaryReceipt = receipt,
+        lastAnnouncedWaypointId = null
+      )
+    }
+
+    if (playVoice && _uiState.value.isVoiceGuidanceEnabled) {
+      val firstWp = seaRoute.waypoints.firstOrNull()
+      voiceGuidance?.speakRouteCreation(destName, firstWp?.name, seaRoute.initialBearingDegrees)
+    }
+
+    return seaRoute
+  }
+
+  fun speakActiveRouteRecommendation() {
+    val route = _uiState.value.activeSeaRoute
+    if (route != null && !route.isRejectedLandTarget) {
+      val firstWp = route.waypoints.firstOrNull()
+      voiceGuidance?.speakRouteCreation(route.destinationName, firstWp?.name, route.initialBearingDegrees)
+    } else {
+      val port = _uiState.value.selectedPort
+      calculateAndSetSeaRoute(port.latitude, port.longitude, port.name, playVoice = true)
+    }
+  }
+
+  fun speakWaypointDetail(waypoint: com.example.engine.MarineWaypoint) {
+    voiceGuidance?.speakWaypointDetail(
+      waypointName = waypoint.name,
+      legDistanceNm = waypoint.legDistanceNm,
+      recommendedHeadingDegrees = waypoint.legBearingDegrees,
+      etaTimeStr = waypoint.etaTimeStr,
+      nextHeadingDegrees = waypoint.nextLegBearingDegrees
+    )
+  }
+
+  fun toggleVoiceGuidance() {
+    _uiState.update { current ->
+      val updated = !current.isVoiceGuidanceEnabled
+      if (!updated) {
+        voiceGuidance?.stop()
+      }
+      current.copy(isVoiceGuidanceEnabled = updated)
+    }
+  }
+
+  fun setShowVoiceSettingsDialog(show: Boolean) {
+    _uiState.update { it.copy(showVoiceSettingsDialog = show) }
+  }
+
+  fun setTtsPitch(pitch: Float) {
+    _uiState.update { it.copy(ttsPitch = pitch) }
+    voiceGuidance?.pitch = pitch
+    voiceGuidance?.configureFemaleVoice()
+  }
+
+  fun setTtsSpeechRate(rate: Float) {
+    _uiState.update { it.copy(ttsSpeechRate = rate) }
+    voiceGuidance?.speechRate = rate
+    voiceGuidance?.configureFemaleVoice()
+  }
+
+  fun testVoiceAnnouncement() {
+    voiceGuidance?.pitch = _uiState.value.ttsPitch
+    voiceGuidance?.speechRate = _uiState.value.ttsSpeechRate
+    voiceGuidance?.configureFemaleVoice()
+    voiceGuidance?.testVoice()
+  }
+
+  fun openSystemTtsSettings(context: android.content.Context) {
+    try {
+      val intent = android.content.Intent("com.android.settings.TTS_SETTINGS")
+      intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+      context.startActivity(intent)
+    } catch (_: Exception) {
+      try {
+        val intent = android.content.Intent("android.settings.TTS_SETTINGS")
+        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+      } catch (_: Exception) {
+        try {
+          val intent = android.content.Intent(android.provider.Settings.ACTION_SETTINGS)
+          intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+          context.startActivity(intent)
+        } catch (_: Exception) {}
+      }
+    }
+  }
+
+  override fun onCleared() {
+    super.onCleared()
+    debounceCalcJob?.cancel()
+    debounceWeatherJob?.cancel()
+    com.example.engine.MarineNetworkClient.evictIdleConnections()
+    voiceGuidance?.shutdown()
   }
 }
 

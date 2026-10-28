@@ -14,15 +14,32 @@ import kotlin.math.*
 
 class MarineWeatherProvider {
 
-  private val httpClient = OkHttpClient.Builder()
-    .connectTimeout(6, TimeUnit.SECONDS)
-    .readTimeout(6, TimeUnit.SECONDS)
-    .build()
+  private val httpClient get() = MarineNetworkClient.fastApiClient
+
+  companion object {
+    private data class CachedWeather(val weather: MarineWeather, val timestampMs: Long)
+    private val weatherCache = object : LinkedHashMap<String, CachedWeather>(24, 0.75f, true) {
+      override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CachedWeather>?): Boolean = size > 24
+    }
+    private const val WEATHER_TTL_MS = 5 * 60_000L
+
+    fun clearCache() {
+      synchronized(weatherCache) { weatherCache.clear() }
+    }
+  }
 
   /**
    * GPS veya Liman Koordinatlarına Göre Canlı Deniz & Hava Durumu Verilerini Alır
    */
   suspend fun fetchMarineWeather(latitude: Double, longitude: Double): MarineWeather = withContext(Dispatchers.IO) {
+    val cacheKey = String.format(Locale.US, "%.2f_%.2f", latitude, longitude)
+    val nowMs = System.currentTimeMillis()
+    synchronized(weatherCache) {
+      val cached = weatherCache[cacheKey]
+      if (cached != null && (nowMs - cached.timestampMs) <= WEATHER_TTL_MS) {
+        return@withContext cached.weather
+      }
+    }
     try {
       // 1. Open-Meteo Hava Durumu (Sıcaklık, Nem, Basınç, Rüzgar, Hamle, Yağış)
       val weatherUrl = "https://api.open-meteo.com/v1/forecast?" +
@@ -112,7 +129,7 @@ class MarineWeatherProvider {
         val windyUrl = generateWindyEmbedUrl(latitude, longitude)
         val sunInfo = SunCalculator.calculateSunTimes(latitude, longitude)
 
-        return@withContext MarineWeather(
+        val fetched = MarineWeather(
           latitude = latitude,
           longitude = longitude,
           temperatureC = round(temp * 10.0) / 10.0,
@@ -139,6 +156,10 @@ class MarineWeatherProvider {
           windyEmbedUrl = windyUrl,
           sunTimes = sunInfo
         )
+        synchronized(weatherCache) {
+          weatherCache[cacheKey] = CachedWeather(fetched, System.currentTimeMillis())
+        }
+        return@withContext fetched
       }
     } catch (e: Exception) {
       Log.e("MarineWeather", "Network weather fetch failed, using realistic fallback", e)

@@ -100,7 +100,7 @@ object TxtLoggerManager {
       appendLine("MMSI / IMO         : $mmsi / $imo")
       appendLine("Çağrı İşareti      : $callSign")
       appendLine("Boyutlar (LOA / En): $loa / $beam")
-      appendLine("Statik Veri Kaynağı: ${if (uiState.activeAisVesselData != null) "AIS CANLI" else "LOKAL PROFİL"}")
+      appendLine("Statik Veri Kaynağı: LOKAL PROFİL")
       appendLine()
       appendLine("2. KONUM VE SEYİR TELEMETRİSİ")
       appendLine("Denizci Koordinatı : $marineCoordStr")

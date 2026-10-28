@@ -446,10 +446,17 @@ object AisTrackingEngine {
       lower.contains("black sea") || lower.contains("karadeniz") -> Pair(41.40 + (rng.nextDouble() * 0.5), 29.50 + (rng.nextDouble() * 1.5))
       lower.contains("aegean") || lower.contains("ege") -> Pair(38.20 + (rng.nextDouble() * 0.8), 26.50 + (rng.nextDouble() * 0.8))
       lower.contains("mediterranean") || lower.contains("akdeniz") -> Pair(36.40 + (rng.nextDouble() * 0.6), 31.00 + (rng.nextDouble() * 3.0))
+      lower.contains("atlantic") || lower.contains("atlantik") -> Pair(25.00 + (rng.nextDouble() * 8.0), -40.00 + (rng.nextDouble() * 15.0))
+      lower.contains("pacific") || lower.contains("pasifik") -> Pair(20.00 + (rng.nextDouble() * 8.0), 140.00 + (rng.nextDouble() * 15.0))
+      lower.contains("indian") || lower.contains("hindistan") -> Pair(-10.00 + (rng.nextDouble() * 8.0), 75.00 + (rng.nextDouble() * 15.0))
+      lower.contains("red sea") || lower.contains("kızıldeniz") -> Pair(22.00 + (rng.nextDouble() * 3.0), 38.00 + (rng.nextDouble() * 3.0))
+      lower.contains("gulf") || lower.contains("fars") -> Pair(26.00 + (rng.nextDouble() * 2.0), 52.00 + (rng.nextDouble() * 3.0))
+      lower.contains("caribbean") || lower.contains("karayip") -> Pair(15.00 + (rng.nextDouble() * 5.0), -75.00 + (rng.nextDouble() * 10.0))
+      lower.contains("north sea") || lower.contains("kuzey denizi") -> Pair(55.00 + (rng.nextDouble() * 3.0), 3.00 + (rng.nextDouble() * 4.0))
       lower.contains("baltic") -> Pair(59.30 + (rng.nextDouble() * 0.5), 18.70 + (rng.nextDouble() * 0.8))
       else -> {
-        val baseLat = 40.5 + (rng.nextDouble() * 0.8)
-        val baseLon = 28.8 + (rng.nextDouble() * 1.2)
+        val baseLat = 30.0 + (rng.nextDouble() * 20.0)
+        val baseLon = 10.0 + (rng.nextDouble() * 40.0)
         Pair(baseLat, baseLon)
       }
     }

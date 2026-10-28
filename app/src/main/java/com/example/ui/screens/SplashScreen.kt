@@ -55,8 +55,8 @@ fun SplashScreen(
   }
 
   LaunchedEffect(Unit) {
-    // 3 saniye sonra otomatik geçiş
-    delay(3000L)
+    // Hızlı geçiş
+    delay(300L)
     finishSplashNow()
   }
 

@@ -51,18 +51,6 @@ fun ShipCrossSectionCanvas(
   val textSecondary = getMarineTextSecondary(isDarkMode)
   val textMuted = getMarineTextMuted(isDarkMode)
 
-  // Dalga animasyonu (Hafif ve pürüzsüz)
-  val infiniteTransition = rememberInfiniteTransition(label = "wave_anim")
-  val waveOffset by infiniteTransition.animateFloat(
-    initialValue = 0f,
-    targetValue = 2f * Math.PI.toFloat(),
-    animationSpec = infiniteRepeatable(
-      animation = tween(4000, easing = LinearEasing),
-      repeatMode = RepeatMode.Restart
-    ),
-    label = "wave"
-  )
-
   val currentTide = analysis.curvePoints.minByOrNull {
     kotlin.math.abs(it.hourOfDay - analysis.currentHour)
   }?.tideHeight ?: analysis.maxTideHeight24h
@@ -215,7 +203,7 @@ fun ShipCrossSectionCanvas(
             val waveSegments = 30
             for (i in 0..waveSegments) {
               val x = (w / waveSegments.toFloat()) * i.toFloat()
-              val y = waterLineY + (kotlin.math.sin((i * 0.4f) + waveOffset) * 2f)
+              val y = waterLineY + (kotlin.math.sin(i * 0.4f) * 1.5f)
               lineTo(x, y)
             }
             lineTo(w, seabedY)
